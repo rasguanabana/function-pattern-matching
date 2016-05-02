@@ -21,6 +21,10 @@ class IsDispatchCorrect(unittest.TestCase):
         def foo(a, b, c='baz'):
             return "any, any, str:baz"
 
+        @fpm.case(1, fpm._, fpm._) # equivalent, needed, when we want to match before non-default arg.
+        def foo(a, b, c):
+            return "int:1, any, any"
+
         @fpm.case
         def foo(a, b, c):
             return "any, any, any"
@@ -33,6 +37,7 @@ class IsDispatchCorrect(unittest.TestCase):
         self.assertEqual(foo('baz', 1337, (0, 1, 2)), "str:baz, int:1337, tuple:(0, 1, 2)")
         self.assertEqual(foo('xyz', 1337, (0, 1, 2)), "any, any, any")
         self.assertEqual(foo('xyz', 1331, (0, 1, 2)), "any, int:1331, tuple:(0, 1, 2)")
+        self.assertEqual(foo(1, dict(), False), "int:1, any, any")
         self.assertEqual(foo('xyz', 1237, (0, 1, 2)), "any, any, any")
         self.assertEqual(foo('xyz', 1237, 'baz'), "any, any, str:baz")
         self.assertEqual(foo('bar', 1337, (0, 1, 2), True), "any, any, any, any")

@@ -1,6 +1,7 @@
 .*
 !/.gitignore
 __pycache__
+*.pyc
 *.bak
 *.swp
 doc/_build

@@ -1,6 +1,132 @@
 import function_pattern_matching as fpm
 import unittest
 
+class DoesGuardsWork(unittest.TestCase):
+    def test_simple(self):
+        a1 = fpm.eq(10)
+        self.assertTrue(a1(10))
+        self.assertFalse(a1(0))
+
+        a2 = fpm.ne(10)
+        self.assertTrue(a2(11))
+        self.assertFalse(a2(10))
+
+        a3 = fpm.lt(10)
+        self.assertTrue(a3(-100))
+        self.assertFalse(a3(10))
+        self.assertFalse(a3(9001)) # IT'S OVER 9000!!!
+
+        a4 = fpm.le(10)
+        self.assertTrue(a4(-100))
+        self.assertTrue(a4(10))
+        self.assertFalse(a4(100))
+
+        a5 = fpm.gt(10)
+        self.assertTrue(a5(11))
+        self.assertFalse(a5(10))
+        self.assertFalse(a5(9))
+
+        a6 = fpm.ge(10)
+        self.assertTrue(a6(11))
+        self.assertTrue(a6(10))
+        self.assertFalse(a6(9))
+
+        a7 = fpm.Is(True)
+        self.assertTrue(a7(True))
+        self.assertFalse(a7(None))
+
+        x_ = 1
+        a7a = fpm.Is(x_)
+        self.assertTrue(a7a(x_))
+        self.assertFalse(a7a(2))
+
+        a7b = fpm.Is(None)
+        self.assertTrue(a7b(None))
+        self.assertFalse(a7b(True))
+
+        a8 = fpm.Isnot(None)
+        self.assertTrue(a8(10))
+        self.assertFalse(a8(None))
+
+        a9 = fpm.isoftype(int)
+        self.assertTrue(a9(10))
+        self.assertFalse(a9('qwerty'))
+
+        a10 = fpm.isiterable
+        self.assertFalse(a10(10))
+        self.assertTrue(a10("asd"))
+        self.assertTrue(a10([1,2,3,4]))
+
+        a11 = fpm.In(range(10))
+        self.assertTrue(a11(5))
+        self.assertFalse(a11(10))
+        self.assertFalse(a11(15))
+
+        a12 = fpm.notIn({'a', 2, False})
+        self.assertTrue(a12(10))
+        self.assertTrue(a12(True))
+        self.assertFalse(a12('a'))
+        self.assertFalse(a12(2))
+        self.assertFalse(a12(False))
+
+        a13 = fpm.eTrue
+        self.assertTrue(a13(1))
+        self.assertTrue(a13([10]))
+        self.assertFalse(a13(0))
+        self.assertFalse(a13([]))
+        self.assertFalse(a13(''))
+
+        a14 = fpm.eFalse
+        self.assertFalse(a14(1))
+        self.assertFalse(a14([10]))
+        self.assertTrue(a14(0))
+        self.assertTrue(a14([]))
+        self.assertTrue(a14(''))
+
+    def test_combined(self):
+        # ABC + A*~B~(~A*~C) <=> A(C + ~B)
+        #...
+
+        # is int and ((>0 and <=5) or =10)
+        comp2 = fpm.isoftype(int) & ((fpm.gt(0) & fpm.le(5)) | fpm.eq(10))
+        self.assertFalse(comp2(-10))
+        self.assertFalse(comp2(0))
+        self.assertTrue(comp2(1))
+        self.assertTrue(comp2(4))
+        self.assertTrue(comp2(5))
+        self.assertFalse(comp2(6))
+        self.assertTrue(comp2(10))
+        self.assertFalse(comp2('a'))
+        self.assertFalse(comp2([]))
+        self.assertTrue(comp2(True)) # bool is subclass of int, meh
+
+        # (is int and is not bool and >0 and <=5) or is None
+        comp3 = (fpm.isoftype(int) & ~fpm.isoftype(bool) & fpm.gt(0) & fpm.le(5)) | fpm.Is(None)
+        self.assertFalse(comp3(-10))
+        self.assertFalse(comp3(0))
+        self.assertTrue(comp3(1))
+        self.assertTrue(comp3(4))
+        self.assertTrue(comp3(5))
+        self.assertFalse(comp3(6))
+        self.assertFalse(comp3(10))
+        self.assertFalse(comp3('a'))
+        self.assertFalse(comp3([]))
+        self.assertFalse(comp3(True))
+        #self.assertTrue(comp3(None))
+
+        # bool(.)==True or is None
+        comp4 = fpm.eTrue | fpm.Is(None)
+        self.assertTrue(comp4(1))
+        self.assertTrue(comp4(10))
+        self.assertTrue(comp4('asd'))
+        self.assertTrue(comp4({1,2,3}))
+        self.assertFalse(comp4(0))
+        self.assertFalse(comp4([]))
+        self.assertFalse(comp4(''))
+        self.assertFalse(comp4({}))
+        self.assertFalse(comp4(set()))
+        self.assertTrue(comp4(None))
+
 class IsDispatchCorrect(unittest.TestCase):
     def test_with_catchall(self):
         "Test function defined with catch all case."

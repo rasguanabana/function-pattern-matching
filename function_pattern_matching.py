@@ -1,5 +1,4 @@
 import inspect
-import itertools
 import six
 import warnings
 from collections import defaultdict, OrderedDict
@@ -17,7 +16,7 @@ except ImportError:
 strict_guard_definitions = True # only instances of GuardFunc and RelGuard can be used as guards.
                                 # if set to False, then any callable is allowed, but may cause unexpected behaviour.
 
-class GuardError(Exception): # needed? MatchError isn't sufficient?
+class GuardError(Exception): # FIXME: needed? MatchError isn't sufficient?
     "Guard haven't let argument pass."
     pass
 
@@ -249,12 +248,12 @@ def guard(*dargs, **dkwargs):
 
         # parse dargs'n'dkwargs
         try:
-            arg_list = itertools.chain(arg_spec.args, arg_spec.kwonlyargs)
+            arg_list = arg_spec.args + arg_spec.kwonlyargs
         except AttributeError: # py2, no kwonlyargs
             arg_list = arg_spec.args
 
         # check if number of guards makes sense
-        if len(dargs) > len(arg_spec.args) or len(dkwargs) > len(tuple(arg_list)):
+        if len(dargs) > len(arg_spec.args) or len(dkwargs) > len(arg_list):
             raise ValueError("Too many guard definitions for '%s()'" % decoratee.__name__)
 
         if len(dargs) == 1 and (isinstance(dargs[0], RelGuard) or
@@ -265,7 +264,7 @@ def guard(*dargs, **dkwargs):
             rel_guard = _
             # bind positionals to their names
             argument_guards = OrderedDict(six.moves.zip_longest(arg_spec.args, dargs, fillvalue=_))
-            _already_bound = arg_spec[:len(dargs)] # names of arguments matched with dargs
+            _already_bound = arg_spec.args[:len(dargs)] # names of arguments matched with dargs
 
         for arg_name in dkwargs.keys():
             if arg_name in _already_bound: # check if guards in kwargs does not overlap with those bound above
@@ -294,7 +293,7 @@ def guard(*dargs, **dkwargs):
                     rel_guard = _
 
         # check if guards are really guards, or at least callable.
-        if not isinstance(rel_guard, RelGuard):
+        if rel_guard is not _ and not isinstance(rel_guard, RelGuard):
             if strict_guard_definitions:
                 raise ValueError("Specified relguard is not an instance of RelGuard")
             else:
@@ -304,7 +303,7 @@ def guard(*dargs, **dkwargs):
                         RuntimeWarning)
 
         for arg_name, grd in argument_guards.items():
-            if not isinstance(grd, GuardFunc):
+            if grd is not _ and not isinstance(grd, GuardFunc):
                 if strict_guard_definitions:
                     raise ValueError("Guard specified for argument '%s' is not an instance of GuardFunc" % arg_name)
                 else:
@@ -332,7 +331,7 @@ def guard(*dargs, **dkwargs):
 
         for arg_name, def_val in argument_defaults.items():
             if argument_guards[arg_name](def_val) is False:
-                raise ValueError("Default value for argument '%s' does not pass through a guard")
+                raise ValueError("Default value for argument '%s' does not pass through a guard" % arg_name)
 
         argument_guards_list = list(argument_guards.values())
 
@@ -343,7 +342,7 @@ def guard(*dargs, **dkwargs):
             for i, arg_value in enumerate(args):
                 grd = argument_guards_list[i]
                 if not grd(arg_value):
-                    raise GuardError("Wrong value for argument on position %i" % i)
+                    raise GuardError("Wrong value for argument on position %i" % (i + 1))
                 else:
                     pass # just to explicitly note, that argument passed guard.
 
@@ -359,7 +358,10 @@ def guard(*dargs, **dkwargs):
 
             return decoratee(*args, **kwargs)
 
-        return guarded
+        ret = guarded
+        ret._argument_guards = argument_guards
+        ret.__guarded__ = decoratee # keep reference to original function (FIXME: needed?)
+        return ret
 
     # decide whether initialise decorator
     if len(dkwargs) == 0 and len(dargs) == 1 and callable(dargs[0]) and not isinstance(dargs[0], (GuardFunc, RelGuard)):

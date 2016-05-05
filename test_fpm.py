@@ -3,6 +3,8 @@ import unittest
 
 class DoesGuardsWork(unittest.TestCase):
     def test_simple(self):
+        "Test each simple guard"
+
         a1 = fpm.eq(10)
         self.assertTrue(a1(10))
         self.assertFalse(a1(0))
@@ -84,8 +86,7 @@ class DoesGuardsWork(unittest.TestCase):
         self.assertTrue(a14(''))
 
     def test_combined(self):
-        # ABC + A*~B~(~A*~C) <=> A(C + ~B)
-        #...
+        "Test some combined guards"
 
         # is int and ((>0 and <=5) or =10)
         comp2 = fpm.isoftype(int) & ((fpm.gt(0) & fpm.le(5)) | fpm.eq(10))
@@ -114,7 +115,7 @@ class DoesGuardsWork(unittest.TestCase):
         self.assertFalse(comp3(True))
         #self.assertTrue(comp3(None))
 
-        # bool(.)==True or is None
+        # evals to True or is None
         comp4 = fpm.eTrue | fpm.Is(None)
         self.assertTrue(comp4(1))
         self.assertTrue(comp4(10))
@@ -126,6 +127,20 @@ class DoesGuardsWork(unittest.TestCase):
         self.assertFalse(comp4({}))
         self.assertFalse(comp4(set()))
         self.assertTrue(comp4(None))
+
+        # is iterable xor evals to True
+        comp5 = fpm.isiterable ^ fpm.eTrue
+        self.assertTrue(comp5([]))
+        self.assertTrue(comp5(1))
+        self.assertFalse(comp5(0))
+        self.assertFalse(comp5([1,2,3]))
+
+    def test_relation_guards(self):
+        "Test relguard (relations between arguments"
+
+        # ABC + A*~B~(~A*~C) <=> A(C + ~B)
+        # ...
+        raise NotImplementedError
 
 class IsDispatchCorrect(unittest.TestCase):
     def test_with_catchall(self):

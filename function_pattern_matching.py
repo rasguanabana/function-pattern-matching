@@ -290,7 +290,7 @@ def guard(*dargs, **dkwargs):
                 try:
                     rel_guard = argument_guards.pop('return')
                 except KeyError:
-                    rel_guard = _
+                    rel_guard = _ # FIXME: what about mixed definitions? e.g. guards as annotations, relguard as decarg?
 
         # check if guards are really guards, or at least callable.
         if rel_guard is not _ and not isinstance(rel_guard, RelGuard):

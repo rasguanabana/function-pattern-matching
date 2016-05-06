@@ -81,8 +81,8 @@ instances can be used in guard definitions. If it's set to ``False``, then any c
 recommended, as guard behaviour may be unexpected (``RuntimeWarning`` is emitted), e.g. combining regular callables
 will not work.
 
-``GuardFunc`` objects can be combined together with ``&``, ``|`` and ``^`` logical operators. Note however, that *xor*
-isn't very useful here.
+``GuardFunc`` objects can be negated with ``~`` and combined together with ``&``, ``|`` and ``^`` logical operators.
+Note however, that *xor* isn't very useful here.
 
 List of provided guard functions
 ................................
@@ -143,13 +143,13 @@ There are two ways of defining guards:
 - As decorator arguments
   - positionally: guards order will match decoratee's (the function being decorated) arguments order.
     .. code-block:: python
-        
+
         @fpm.guard(fpm.isoftype(int) & fpm.ge(0), fpm.isiterable)
         def func(number, iterable):
             pass
   - as keyword arguments: e.g. guard under name *a* will guard decoratee's argument named *a*.
     .. code-block:: python
-        
+
         @fpm.guard(
             name = fpm.isoftype(int) & fpm.ge(0),
             iterable = fpm.isiterable
@@ -158,7 +158,7 @@ There are two ways of defining guards:
             pass
 - As annotations (Python 3 only)
   .. code-block:: python
-      
+
       @fpm.guard
       def func(
           number: fpm.isoftype(int) & fpm.ge(0),

@@ -368,7 +368,7 @@ def guard(*dargs, **dkwargs):
                 if arg not in arg_spec.args and arg not in arg_spec.kwonlyargs:
                     raise ValueError("Relguard's argument names must be a subset of %s argument names" % decoratee.__name__)
 
-        # check if defaults pass through guards
+        # get default arg vals
         if arg_spec.defaults is not None:
             argument_defaults = dict(
                     zip(
@@ -389,34 +389,22 @@ def guard(*dargs, **dkwargs):
         except AttributeError: # py2, no kwonlyargs
             pass
 
-        if argument_defaults and not rel_guard(**argument_defaults):
-            raise ValueError("Default values do not pass through relguard")
-
-        for arg_name, def_val in argument_defaults.items():
-            if argument_guards[arg_name](def_val) is False:
-                raise ValueError("Default value for argument '%s' does not pass through a guard" % arg_name)
-
-        argument_guards_list = list(argument_guards.values())
-
         @six.wraps(decoratee)
         def guarded(*args, **kwargs):
 
+            # bind defaults, args and kwargs to names
+            bound_args = argument_defaults.copy() # get defaults first, so they can be overwritten
+            bound_args.update(zip(arg_spec.args[:len(args)], args)) # bind positional args to names
+            bound_args.update(kwargs) # add kwargs
+
             # check relations between args/environment first
-            bound_args = dict(zip(arg_spec.args[:len(args)], args)) # bind args to names
-            bound_args.update(kwargs)
             if not rel_guard(**bound_args): # argument order in relguard is not guaranteed to match decoratee's
                 raise GuardError("Arguments did not pass through relguard")
+            else:
+                pass # just to explicitly note, that argument passed relguard.
 
-            # check input args one by one
-            for i, arg_value in enumerate(args):
-                grd = argument_guards_list[i]
-                if not grd(arg_value):
-                    raise GuardError("Wrong value for argument on position %i" % (i + 1))
-                else:
-                    pass # just to explicitly note, that argument passed guard.
-
-            # then kwargs
-            for arg_name, arg_value in kwargs.items():
+            # check bound_args one by one
+            for arg_name, arg_value in bound_args.items():
                 grd = argument_guards[arg_name]
                 if not grd(arg_value):
                     raise GuardError("Wrong value for keyword argument '%s'" % arg_name)

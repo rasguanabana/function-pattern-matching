@@ -296,6 +296,19 @@ class DoGuardsWork(unittest.TestCase):
         self.assertRaises(fpm.GuardError, rwsk, 9000, "x", 9000.1)
         self.assertRaises(fpm.GuardError, rwsk, 'x', 'y', 'x')
 
+        # fancy, with default args
+        @fpm.guard(
+            fpm.relguard(lambda a, c: type(a) == type(c)),
+            a = fpm.eTrue,
+            b = fpm.Isnot(None)
+        )
+        def fancy(a, b=[], c=1):
+            return (a, b, c)
+
+        self.assertEqual(fancy(9), (9, [], 1))
+        self.assertEqual(fancy(-1, 'x'), (-1, 'x', 1))
+        self.assertEqual(fancy('a', b'b', 'c'), ('a', b'b', 'c'))
+
     def test_rguard_decargs(self):
         "Test every possible correct way of defining guards with rguard decorator (Py2 & 3)"
 
@@ -494,6 +507,8 @@ class DoGuardsWork(unittest.TestCase):
         # relguard with positionals as not 1st arg
 
         # defaults not passing through guards and relguard
+
+        # var (kw)args
 
         # guarding guarded
         pass

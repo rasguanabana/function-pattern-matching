@@ -19,7 +19,7 @@ def ks3(
 
 # relguard-only all
 @fpm.guard
-def roa3(a, b, c) -> fpm.relguard(lambda a, b, c: a == b and b > c):
+def roa3(a, b, c) -> fpm.relguard(lambda a, b, c: a == b and b < c):
     return (a, b, c)
 
 # relguard-only some
@@ -28,8 +28,9 @@ def ros3(a, b, c) -> fpm.relguard(lambda a, c: (a + 1) == c):
     return (a, b, c)
 
 # relguard-only none
+some_external_var3 = True
 @fpm.guard
-def ron3(a, b, c) -> fpm.relguard(lambda: bool(10) == True):
+def ron3(a, b, c) -> fpm.relguard(lambda: some_external_var3 == True):
     return (a, b, c)
 
 # relguard with all annotations
@@ -70,4 +71,56 @@ def rwsk3m(
     b,
     c
 ):
+    return (a, b, c)
+
+# relguard with all annotations, rguard mixed
+@fpm.rguard(lambda a, c: a == c)
+def rwak3rm(
+    a: fpm.isoftype(int),
+    b: fpm.isoftype(str),
+    c: fpm.isoftype(float)
+):
+    return (a, b, c)
+
+# relguard with some annotations, rguard mixed
+@fpm.rguard(lambda a, c: a == c)
+def rwsk3rm(
+    a: fpm.isoftype(int),
+    b,
+    c
+):
+    return (a, b, c)
+
+# relguard-only all, raguard
+@fpm.raguard
+def roa3ra(a, b, c) -> lambda a, b, c: a == b and b < c:
+    return (a, b, c)
+
+# relguard-only some, raguard
+@fpm.raguard
+def ros3ra(a, b, c) -> lambda a, c: (a + 1) == c:
+    return (a, b, c)
+
+# relguard-only none, raguard
+some_external_var3b = False
+@fpm.raguard
+def ron3ra(a, b, c) -> lambda: some_external_var3b == False:
+    return (a, b, c)
+
+# relguard with all annotations
+@fpm.raguard
+def rwak3ra(
+    a: fpm.isoftype(int),
+    b: fpm.isoftype(str),
+    c: fpm.isoftype(float)
+) -> lambda a, c: a == c:
+    return (a, b, c)
+
+# relguard with some annotations
+@fpm.raguard
+def rwsk3ra(
+    a: fpm.isoftype(int),
+    b,
+    c
+) -> lambda a, c: a == c:
     return (a, b, c)

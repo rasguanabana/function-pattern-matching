@@ -22,7 +22,7 @@ except ImportError:
 strict_guard_definitions = True # only instances of GuardFunc and RelGuard can be used as guards.
                                 # if set to False, then any callable is allowed, but may cause unexpected behaviour.
 
-class GuardError(Exception): # FIXME: needed? MatchError isn't sufficient?
+class GuardError(Exception):
     "Guard haven't let argument pass."
     pass
 
@@ -320,7 +320,7 @@ def guard(*dargs, **dkwargs):
         argument_guards.update(dkwargs)
 
         # if argument_guards is empty (catch-all, more precisely), try extracting guards from annotations
-        if all(grd == _ for grd in argument_guards):
+        if all(grd is _ for grd in argument_guards.values()):
             try:
                 arg_annotations = arg_spec.annotations # raises AttributeError in py2
                 six.next(six.iterkeys(arg_annotations))
@@ -332,10 +332,11 @@ def guard(*dargs, **dkwargs):
                         (arg_name, arg_annotations.get(arg_name, _)) # name -> annotation, or _ if no annotation.
                         for arg_name in arg_list # arg_list dictates right order
                         )
-                try:
-                    rel_guard = argument_guards.pop('return')
-                except KeyError:
-                    rel_guard = _ # FIXME: what about mixed definitions? e.g. guards as annotations, relguard as decarg?
+        if rel_guard is _:
+            try:
+                rel_guard = arg_spec.annotations.get("return", _)
+            except AttributeError:
+                pass
 
         if (not argument_guards or all(grd is _ for grd in argument_guards)) and rel_guard is _:
             raise ValueError("No guards specified for '%s()'" % decoratee.__name__)
@@ -388,6 +389,9 @@ def guard(*dargs, **dkwargs):
         except AttributeError: # py2, no kwonlyargs
             pass
 
+        if argument_defaults and not rel_guard(**argument_defaults):
+            raise ValueError("Default values do not pass through relguard")
+
         for arg_name, def_val in argument_defaults.items():
             if argument_guards[arg_name](def_val) is False:
                 raise ValueError("Default value for argument '%s' does not pass through a guard" % arg_name)
@@ -419,14 +423,12 @@ def guard(*dargs, **dkwargs):
                 else:
                     pass # just to explicitly note, that argument passed guard.
 
-            # TODO: relguard. after or before those ^ ?
-
             return decoratee(*args, **kwargs)
 
         ret = guarded
         ret._argument_guards = argument_guards
         ret._relguard = rel_guard
-        ret.__guarded__ = decoratee # keep reference to original function (FIXME: needed?)
+        ret.__guarded__ = decoratee
         return ret
 
     # decide whether initialise decorator
@@ -437,3 +439,11 @@ def guard(*dargs, **dkwargs):
 
 def rguard(rel_guard, **kwargs):
     return guard(RelGuard(rel_guard), **kwargs)
+
+def raguard(decoratee):
+    try:
+        rel_guard = decoratee.__annotations__['return']
+    except (AttributeError, KeyError):
+        raise ValueError("raguard requires return annotation")
+    else:
+        return guard(RelGuard(rel_guard))(decoratee)

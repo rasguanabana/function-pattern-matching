@@ -1,3 +1,5 @@
+#TODO: test guards with default args
+#TODO: write test for erroneous
 import function_pattern_matching as fpm
 import unittest
 try:
@@ -278,6 +280,9 @@ class DoGuardsWork(unittest.TestCase):
 
         self.assertEqual(rwak(1, "asd", 1.0), (1, "asd", 1.0))
         self.assertRaises(fpm.GuardError, rwak, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak, 'x', 'y', 'x')
+        self.assertRaises(fpm.GuardError, rwak, 1, 0, 1.0)
+        self.assertRaises(fpm.GuardError, rwak, 1, 'x', 1)
 
         # relguard with some keywords
         @fpm.guard(
@@ -289,6 +294,7 @@ class DoGuardsWork(unittest.TestCase):
 
         self.assertEqual(rwsk(1, "asd", 1.0), (1, "asd", 1.0))
         self.assertRaises(fpm.GuardError, rwsk, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwsk, 'x', 'y', 'x')
 
     def test_rguard_decargs(self):
         "Test every possible correct way of defining guards with rguard decorator (Py2 & 3)"
@@ -333,6 +339,9 @@ class DoGuardsWork(unittest.TestCase):
 
         self.assertEqual(rwakR(1, "asd", 1.0), (1, "asd", 1.0))
         self.assertRaises(fpm.GuardError, rwakR, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwakR, 'x', 'y', 'x')
+        self.assertRaises(fpm.GuardError, rwakR, 1, 0, 1.0)
+        self.assertRaises(fpm.GuardError, rwakR, 1, 'x', 1)
 
         # relguard with some keywords
         @fpm.rguard(
@@ -344,38 +353,154 @@ class DoGuardsWork(unittest.TestCase):
 
         self.assertEqual(rwskR(1, "asd", 1.0), (1, "asd", 1.0))
         self.assertRaises(fpm.GuardError, rwskR, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwskR, 'x', 'y', 'x')
 
     def test_guarded_correctly_annotations(self):
         "Test every possible correct way of defining guards as annotations (Py3 only, no relguards)"
 
-        if py3:
-            pass
+        if not py3:
+            return
 
-        raise NotImplementedError
+        # annotations all
+        self.assertEqual(ka3(1, "", ""), (1, "", ""))
+        self.assertRaises(fpm.GuardError, ka3, 0, "", [])
+        self.assertRaises(fpm.GuardError, ka3, 1, 1, 0)
+        self.assertRaises(fpm.GuardError, ka3, 1, '', True)
+
+        # annotations some
+        self.assertEqual(ks3(True, 0, 50), (True, 0, 50))
+        self.assertRaises(fpm.GuardError, ks3, None, 0, 50)
+        self.assertRaises(fpm.GuardError, ks3, 1, '', 1000)
 
     def test_guarded_correctly_annotations_with_relguards(self):
         "Test every possible correct way of defining guards as annotations (Py3 only, with relguards)"
 
-        if py3:
-            pass
+        if not py3:
+            return
 
-        raise NotImplementedError
+        # relguard-only all
+        self.assertEqual(roa3(10, 10, 15), (10, 10, 15))
+        self.assertRaises(fpm.GuardError, roa3, 1, 5, 12)
+        self.assertRaises(fpm.GuardError, roa3, 1, 1, -5)
+        self.assertRaises(fpm.GuardError, roa3, [], [], 0)
+
+        # relguard-only some
+        self.assertEqual(ros3(10, -10, 11), (10, -10, 11))
+        self.assertRaises(fpm.GuardError, ros3, 0, 0, 0)
+
+        # relguard-only none
+        some_external_var3 = True
+        self.assertEqual(ron3(1, 1, 1), (1, 1, 1))
+        #some_external_var3 = False
+        #self.assertRaises(fpm.GuardError, ron3, 1, 1, 1)
+
+        # relguard with all annotations
+        self.assertEqual(rwak3(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwak3, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3, 'x', 'y', 'x')
+        self.assertRaises(fpm.GuardError, rwak3, 1, 0, 1.0)
+        self.assertRaises(fpm.GuardError, rwak3, 1, 'x', 1)
+
+        # relguard with some annotations
+        self.assertEqual(rwsk3(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwsk3, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3, 'x', 'y', 'x')
+
+        # relguard with all annotations, mixed
+        self.assertEqual(rwak3m(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwak3m, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3m, 'x', 'y', 'x')
+        self.assertRaises(fpm.GuardError, rwak3m, 1, 0, 1.0)
+        self.assertRaises(fpm.GuardError, rwak3m, 1, 'x', 1)
+
+        # relguard with some annotations, mixed
+        self.assertEqual(rwsk3m(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwsk3m, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3m, 'x', 'y', 'x')
 
     def test_rguard_annotations(self):
         "Test every possible correct way of defining guards with rguard decorator (Py3 only)"
 
-        if py3:
-            pass
+        if not py3:
+            return
 
-        raise NotImplementedError
+        # relguard with all annotations, rguard mixed
+        self.assertEqual(rwak3rm(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwak3rm, 9000, "x", 9000.1)
+
+        # relguard with some annotations, rguard mixed
+        self.assertEqual(rwsk3rm(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwsk3rm, 9000, "x", 9000.1)
+
+    def test_raguard_annotations(self):
+        "Test raguard"
+
+        if not py3:
+            return
+
+        # relguard-only all
+        self.assertEqual(roa3ra(10, 10, 15), (10, 10, 15))
+        self.assertRaises(fpm.GuardError, roa3ra, 1, 5, 12)
+        self.assertRaises(fpm.GuardError, roa3ra, 1, 1, -5)
+        self.assertRaises(fpm.GuardError, roa3ra, [], [], 0)
+
+        # relguard-only some
+        self.assertEqual(ros3ra(10, -10, 11), (10, -10, 11))
+        self.assertRaises(fpm.GuardError, ros3ra, 0, 0, 0)
+
+        # relguard-only none
+        self.assertEqual(ron3ra(1, 1, 1), (1, 1, 1))
+        #self.assertRaises(fpm.GuardError, ron3ra, 1, 1, 1)
+
+        # relguard with all annotations
+        self.assertEqual(rwak3ra(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwak3ra, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3ra, 'x', 'y', 'x')
+        self.assertRaises(fpm.GuardError, rwak3ra, 1, 0, 1.0)
+        self.assertRaises(fpm.GuardError, rwak3ra, 1, 'x', 1)
+
+        # relguard with some annotations
+        self.assertEqual(rwsk3ra(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwsk3ra, 9000, "x", 9000.1)
+        self.assertRaises(fpm.GuardError, rwak3ra, 'x', 'y', 'x')
 
     def test_guarded_definition_errors_decargs(self):
         "Test syntactically correct but erroneous guard definitions"
-        raise NotImplementedError
+
+        ## no relguard tests:
+
+        # no guards
+
+        # too many positionals
+
+        # not known keyword arg
+
+        # positional-keyword overlap (same)
+
+        # positional-keyword overlap (diff)
+
+        # not a guard
+
+        ## with relguard tests:
+
+        # not a relguard
+
+        # wrong arg names in relguard
+
+        # exceeding arg names in relguard (good mixed with bad)
+
+        # relguard with positionals
+
+        # relguard with positionals as not 1st arg
+
+        # defaults not passing through guards and relguard
+
+        # guarding guarded
+        pass
 
     def test_guarded_definition_errors_annotations(self):
         "Test syntactically correct but erroneous guard definitions"
-        raise NotImplementedError
+        pass
 
 class IsDispatchCorrect():#unittest.TestCase):
     def test_with_catchall(self):

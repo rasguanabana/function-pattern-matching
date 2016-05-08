@@ -143,9 +143,16 @@ class DoGuardsWork(unittest.TestCase):
     def test_relation_guards(self):
         "Test relguard (relations between arguments)"
 
-        # ABC + A*~B~(~A*~C) <=> A(C + ~B)
-        # ...
-        raise NotImplementedError
+        rg1 = fpm.relguard(lambda a, b, c: a + 1 == b and b + 1 == c and a > 0)
+        self.assertTrue(rg1(a=1, b=2, c=3))
+        self.assertFalse(rg1(a=0, b=0, c=0))
+        self.assertFalse(rg1(a=[], b=0, c=0))
+        self.assertEqual(rg1.__argnames__, {'a', 'b', 'c'})
+
+        some_external_var = 9
+        rg2 = fpm.relguard(lambda: some_external_var == 10)
+        self.assertFalse(rg2())
+        self.assertEqual(rg2.__argnames__, set())
 
     def test_guarded_correctly_decargs(self):
         "Test every possible correct way of defining guards (Py2 & 3, no relguards)"
@@ -156,10 +163,10 @@ class DoGuardsWork(unittest.TestCase):
             return (a, b, c)
 
         self.assertEqual(pc(0, 1, 2), (0, 1, 2))
-        self.assertRaises(fpm.GuardError, pc, (1, 1, 2))
-        self.assertRaises(fpm.GuardError, pc, (0, -1, 2))
-        self.assertRaises(fpm.GuardError, pc, (0, 1, 'a'))
-        self.assertRaises(fpm.GuardError, pc, (1, 1, 'a'))
+        self.assertRaises(fpm.GuardError, pc, 1, 1, 2)
+        self.assertRaises(fpm.GuardError, pc, 0, -1, 2)
+        self.assertRaises(fpm.GuardError, pc, 0, 1, 'a')
+        self.assertRaises(fpm.GuardError, pc, 1, 1, 'a')
 
         # positional some (first two args)
         @fpm.guard(fpm.eTrue, fpm.eTrue & fpm.isiterable)
@@ -168,9 +175,9 @@ class DoGuardsWork(unittest.TestCase):
 
         self.assertEqual(ps(10, {1, 2}, None), (10, {1, 2}, None))
         self.assertEqual(ps(10, {1, 2}, fpm), (10, {1, 2}, fpm))
-        self.assertRaises(fpm.GuardError, ps, (None, [1], "x"))
-        self.assertRaises(fpm.GuardError, ps, (1, 1, "x"))
-        self.assertRaises(fpm.GuardError, ps, (1, [], "1"))
+        self.assertRaises(fpm.GuardError, ps, None, [1], "x")
+        self.assertRaises(fpm.GuardError, ps, 1, 1, "x")
+        self.assertRaises(fpm.GuardError, ps, 1, [], "1")
 
         # positional first-only (a.k.a does it clash with relguard)
         @fpm.guard(~fpm.isiterable)
@@ -178,7 +185,7 @@ class DoGuardsWork(unittest.TestCase):
             return (a, b, c)
 
         self.assertEqual(pfo(1, 0, 0), (1, 0, 0))
-        self.assertRaises(fpm.GuardError, pfo, ("string", None, None))
+        self.assertRaises(fpm.GuardError, pfo, "string", None, None)
 
         # positional with catch-alls
         @fpm.guard(fpm._, fpm._, fpm.isoftype(float))
@@ -186,15 +193,15 @@ class DoGuardsWork(unittest.TestCase):
             return (a, b, c)
 
         self.assertEqual(pwca1(0, pwca1, 1.0), (0, pwca1, 1.0))
-        self.assertRaises(fpm.GuardError, pwca1, (0, lambda: None, 9001))
+        self.assertRaises(fpm.GuardError, pwca1, 0, lambda: None, 9001)
 
         @fpm.guard(fpm.lt(0), fpm._, fpm.isoftype(float))
         def pwca2(a, b, c):
             return (a, b, c)
 
         self.assertEqual(pwca2(-1, (), 9000.1), (-1, (), 9000.1)) # that's over 9000, too.
-        self.assertRaises(fpm.GuardError, pwca2, (0, 1, 1.0))
-        self.assertRaises(fpm.GuardError, pwca2, (-1, 1, 1))
+        self.assertRaises(fpm.GuardError, pwca2, 0, 1, 1.0)
+        self.assertRaises(fpm.GuardError, pwca2, -1, 1, 1)
 
         # keyword all
         @fpm.guard(
@@ -206,9 +213,9 @@ class DoGuardsWork(unittest.TestCase):
             return (a, b, c)
 
         self.assertEqual(ka(1, "", ""), (1, "", ""))
-        self.assertRaises(fpm.GuardError, ka, (0, "", []))
-        self.assertRaises(fpm.GuardError, ka, (1, 1, 0))
-        self.assertRaises(fpm.GuardError, ka, (1, '', True))
+        self.assertRaises(fpm.GuardError, ka, 0, "", [])
+        self.assertRaises(fpm.GuardError, ka, 1, 1, 0)
+        self.assertRaises(fpm.GuardError, ka, 1, '', True)
 
         # keyword some
         @fpm.guard(
@@ -219,18 +226,23 @@ class DoGuardsWork(unittest.TestCase):
             return (a, b, c)
 
         self.assertEqual(ks(True, 0, 50), (True, 0, 50))
-        (None, 0, 50))
-        (1, '', 1000))
+        self.assertRaises(fpm.GuardError, ks, None, 0, 50)
+        self.assertRaises(fpm.GuardError, ks, 1, '', 1000)
 
     def test_guarded_correctly_decargs_with_relguards(self):
         "Test every possible correct way of defining guards (Py2 & 3, with relguards)"
 
         # relguard-only all
         @fpm.guard(
-            fpm.relguard(lambda a, b, c: a == b and b > c)
+            fpm.relguard(lambda a, b, c: a == b and b < c)
         )
         def roa(a, b, c):
             return (a, b, c)
+
+        self.assertEqual(roa(10, 10, 15), (10, 10, 15))
+        self.assertRaises(fpm.GuardError, roa, 1, 5, 12)
+        self.assertRaises(fpm.GuardError, roa, 1, 1, -5)
+        self.assertRaises(fpm.GuardError, roa, [], [], 0)
 
         # relguard-only some
         @fpm.guard(
@@ -239,12 +251,20 @@ class DoGuardsWork(unittest.TestCase):
         def ros(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(ros(10, -10, 11), (10, -10, 11))
+        self.assertRaises(fpm.GuardError, ros, 0, 0, 0)
+
         # relguard-only none
+        some_external_var = True
         @fpm.guard(
-            fpm.relguard(lambda: bool(10) == True)
+            fpm.relguard(lambda: some_external_var == True)
         )
         def ron(a, b, c):
             return (a, b, c)
+
+        self.assertEqual(ron(1, 1, 1), (1, 1, 1))
+        some_external_var = False
+        self.assertRaises(fpm.GuardError, ron, 1, 1, 1)
 
         # relguard with all keywords
         @fpm.guard(
@@ -256,6 +276,9 @@ class DoGuardsWork(unittest.TestCase):
         def rwak(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(rwak(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwak, 9000, "x", 9000.1)
+
         # relguard with some keywords
         @fpm.guard(
             fpm.relguard(lambda a, c: a == c),
@@ -264,23 +287,39 @@ class DoGuardsWork(unittest.TestCase):
         def rwsk(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(rwsk(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwsk, 9000, "x", 9000.1)
+
     def test_rguard_decargs(self):
         "Test every possible correct way of defining guards with rguard decorator (Py2 & 3)"
 
         # relguard-only all
-        @fpm.rguard(lambda a, b, c: a == b and b > c)
+        @fpm.rguard(lambda a, b, c: a == b and b < c)
         def roaR(a, b, c):
             return (a, b, c)
+
+        self.assertEqual(roaR(10, 10, 15), (10, 10, 15))
+        self.assertRaises(fpm.GuardError, roaR, 1, 5, 12)
+        self.assertRaises(fpm.GuardError, roaR, 1, 1, -5)
+        self.assertRaises(fpm.GuardError, roaR, [], [], 0)
 
         # relguard-only some
         @fpm.rguard(lambda a, c: (a + 1) == c)
         def rosR(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(rosR(10, -10, 11), (10, -10, 11))
+        self.assertRaises(fpm.GuardError, rosR, 0, 0, 0)
+
         # relguard-only none
-        @fpm.rguard(lambda: bool(10) == True)
+        some_external_var = True
+        @fpm.rguard(lambda: some_external_var == True)
         def ronR(a, b, c):
             return (a, b, c)
+
+        self.assertEqual(ronR(1, 1, 1), (1, 1, 1))
+        some_external_var = False
+        self.assertRaises(fpm.GuardError, ronR, 1, 1, 1)
 
         # relguard with all keywords
         @fpm.rguard(
@@ -292,6 +331,9 @@ class DoGuardsWork(unittest.TestCase):
         def rwakR(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(rwakR(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwakR, 9000, "x", 9000.1)
+
         # relguard with some keywords
         @fpm.rguard(
             lambda a, c: a == c,
@@ -300,11 +342,16 @@ class DoGuardsWork(unittest.TestCase):
         def rwskR(a, b, c):
             return (a, b, c)
 
+        self.assertEqual(rwskR(1, "asd", 1.0), (1, "asd", 1.0))
+        self.assertRaises(fpm.GuardError, rwskR, 9000, "x", 9000.1)
+
     def test_guarded_correctly_annotations(self):
         "Test every possible correct way of defining guards as annotations (Py3 only, no relguards)"
 
         if py3:
             pass
+
+        raise NotImplementedError
 
     def test_guarded_correctly_annotations_with_relguards(self):
         "Test every possible correct way of defining guards as annotations (Py3 only, with relguards)"
@@ -312,21 +359,25 @@ class DoGuardsWork(unittest.TestCase):
         if py3:
             pass
 
+        raise NotImplementedError
+
     def test_rguard_annotations(self):
         "Test every possible correct way of defining guards with rguard decorator (Py3 only)"
 
         if py3:
             pass
 
+        raise NotImplementedError
+
     def test_guarded_definition_errors_decargs(self):
         "Test syntactically correct but erroneous guard definitions"
-        pass
+        raise NotImplementedError
 
     def test_guarded_definition_errors_annotations(self):
         "Test syntactically correct but erroneous guard definitions"
-        pass
+        raise NotImplementedError
 
-class IsDispatchCorrect(unittest.TestCase):
+class IsDispatchCorrect():#unittest.TestCase):
     def test_with_catchall(self):
         "Test function defined with catch all case"
 
@@ -381,8 +432,8 @@ class IsDispatchCorrect(unittest.TestCase):
         def fac(n):
             return n * fac(n-1)
 
-        self.assertRaises(fpm.GuardError, fac, (-1,))
-        self.assertRaises(fpm.GuardError, fac, ('not an int',))
+        self.assertRaises(fpm.GuardError, fac, -1)
+        self.assertRaises(fpm.GuardError, fac, 'not an int')
 
         self.assertEqual(fac(0), 1)
         self.assertEqual(fac(1), 1)
@@ -412,7 +463,7 @@ class IsDispatchCorrect(unittest.TestCase):
         def fib(n):
             return fib(n-1) + fib(n-2)
 
-        self.assertRaises(fpm.GuardError, fib, (-1,))
+        self.assertRaises(fpm.GuardError, fib, -1)
 
         self.assertEqual(fib(0), 0)
         self.assertEqual(fib(1), 1)

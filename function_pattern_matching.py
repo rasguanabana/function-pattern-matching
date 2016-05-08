@@ -1,11 +1,17 @@
 import inspect
 import six
+import types
 import warnings
 from collections import defaultdict, OrderedDict
 try:
     from inspect import _ParameterKind as p_kind
 except ImportError:
-    pass
+    class p_kind():
+        POSITIONAL_ONLY = 1
+        POSITIONAL_OR_KEYWORD = 2
+        VAR_POSITIONAL = 3
+        KEYWORD_ONLY = 4
+        VAR_KEYWORD = 5
 try:
     from types import SimpleNamespace
 except ImportError:
@@ -80,24 +86,74 @@ _ = _() # we need just one and only one instance.
 #        params = inspect.signature(decoratee)
 #        # TODO: continue
 #
-# GUARD #
+# GUARDS #
+
+def _getfullargspec_p(func):
+    """Gets uniform full arguments specification of func, portably."""
+
+    try:
+        sig = inspect.signature(func)
+        sig_params = sig.parameters
+    except AttributeError: # signature method not available
+        # try getfullargspec is present (pre 3.3)
+        try:
+            arg_spec = inspect.getfullargspec(func)
+        except AttributeError: # getfullargspec method not available
+            arg_spec = inspect.getargspec(func) # py2, trying annotations will fail.
+
+    else: # continue conversion for py >=3.3
+        arg_spec = SimpleNamespace() # available since 3.3, just like signature, so it's ok to use it here.
+
+        def _arg_spec_helper(kinds=(), defaults=False, kwonlydefaults=False, annotations=False):
+            for arg_name, param in sig_params.items():
+                if not defaults and not kwonlydefaults and not annotations and param.kind in kinds:
+                    yield arg_name
+                elif sum((defaults, kwonlydefaults, annotations)) > 1:
+                    raise ValueError("Only one of 'defaults', 'kwonlydefaults' or 'annotations' can be True simultaneously")
+                elif param.default is not inspect._empty:
+                    if defaults and param.kind in (p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY):
+                        yield param.default
+                    elif kwonlydefaults and param.kind is p_kind.KEYWORD_ONLY:
+                        yield (arg_name, param.default)
+                elif annotations and param.annotation is not inspect._empty:
+                    yield (arg_name, param.annotation)
+
+        arg_spec.args = tuple(_arg_spec_helper((p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY)))
+        arg_spec.varargs = six.next(_arg_spec_helper((p_kind.VAR_POSITIONAL,)), None)
+        arg_spec.kwonlyargs = tuple(_arg_spec_helper((p_kind.KEYWORD_ONLY,)))
+        arg_spec.varkw = six.next(_arg_spec_helper((p_kind.VAR_KEYWORD,)), None)
+        arg_spec.keywords = arg_spec.varkw # getargspec compat
+        arg_spec.defaults = tuple(_arg_spec_helper(defaults=True)) or None
+        arg_spec.kwonlydefaults = dict(_arg_spec_helper(kwonlydefaults=True))
+        arg_spec.annotations = dict(_arg_spec_helper(annotations=True))
+        if sig.return_annotation is not inspect._empty:
+            arg_spec.annotations['return'] = sig.return_annotation
+
+    return arg_spec
+
+def _getparams(func):
+    """Get tuple of arg name and kind pairs."""
+
+    arg_spec = _getfullargspec_p(func)
+
+    # create tuples for each kind
+    args = tuple((arg, p_kind.POSITIONAL_OR_KEYWORD) for arg in arg_spec.args)
+    varargs = ((arg_spec.varargs, p_kind.VAR_POSITIONAL),) if arg_spec.varargs else ()
+    try:
+        kwonlyargs = tuple((arg, p_kind.KEYWORD_ONLY) for arg in arg_spec.kwonlyargs)
+    except AttributeError: # python2
+        kwonlyargs = ()
+    varkw = ((arg_spec.varkw, p_kind.VAR_KEYWORD),) if arg_spec.keywords else ()
+
+    return args + varargs + kwonlyargs + varkw
 
 class GuardFunc():
     def __init__(self, test):
         if not callable(test):
             raise ValueError("Guard test has to be callable")
 
-        try:
-            sig_params = inspect.signature(test).parameters
-        except AttributeError:
-            # python 2
-            try:
-                test_args = tuple((a, p_kind.POSITIONAL_OR_KEYWORD) for a in inspect.getargspec(test).args)
-            except ValueError:
-                test_args = tuple((a, p_kind.POSITIONAL_OR_KEYWORD) for a in inspect.getfullargspec(test).args)
-        else:
-            # continue in case signature is available (six below may be redundant, as it most probably is python 3)
-            test_args = tuple((a_key, a_val.kind) for a_key, a_val in six.iteritems(sig_params)) # get parameters
+        # check if test signature is ok
+        test_args = _getparams(test)
 
         if len(tuple(arg for arg in test_args
                      if arg[1] in (p_kind.POSITIONAL_ONLY, p_kind.POSITIONAL_OR_KEYWORD))) != 1:
@@ -193,12 +249,33 @@ def notIn(val):
     return GuardFunc(lambda inp: inp not in val)
 
 
-#TODO
 class RelGuard():
-    def __init__(self, *args, **kwargs):
-        pass
-    def __call__(self, *args, **kwargs):
-        return True
+    def __init__(self, test):
+        if not callable(test):
+            raise ValueError("Relguard test has to be callable")
+
+        # extract simplified signature
+        test_args = _getparams(test)
+
+        # varying args are not allowed, they make no sense in reguards.
+        _kinds = {x[1] for x in test_args}
+        if (p_kind.POSITIONAL_ONLY in _kinds or
+                p_kind.VAR_POSITIONAL in _kinds or
+                p_kind.VAR_KEYWORD in _kinds):
+            raise ValueError("Relguard test must take only named not varying arguments")
+
+        self.test = test
+        self.__argnames__ = {x[0] for x in test_args}
+
+    def __call__(self, **kwargs):
+        try:
+            return bool(self.test(**{arg_name: arg_val for arg_name, arg_val in kwargs.items() if arg_name in self.__argnames__}))
+        except TypeError: # occures when unorderable types are compared, but we don't want TypeError to be raised.
+            return False
+
+def relguard(decoratee):
+    "Decorator"
+    return RelGuard(decoratee)
 
 
 def guard(*dargs, **dkwargs):
@@ -207,44 +284,8 @@ def guard(*dargs, **dkwargs):
     def decorator(decoratee):
         "Actual decorator."
 
-        # convert signature to argspec-like object
-        try:
-            sig = inspect.signature(decoratee)
-            sig_params = sig.parameters
-        except AttributeError: # signature method not available
-            # try getfullargspec is present (pre 3.3)
-            try:
-                arg_spec = inspect.getfullargspec(decoratee)
-            except AttributeError: # getfullargspec method not available
-                arg_spec = inspect.getargspec(decoratee) # py2, trying annotations will fail.
-
-        else: # continue conversion for py >=3.3
-            arg_spec = SimpleNamespace() # available since 3.3, just like signature, so it's ok to use it here.
-
-            def _arg_spec_helper(*kinds, defaults=False, kwonlydefaults=False, annotations=False):
-                for arg_name, param in sig_params.items():
-                    if not defaults and not kwonlydefaults and not annotations and param.kind in kinds:
-                        yield arg_name
-                    elif sum((defaults, kwonlydefaults, annotations)) > 1:
-                        raise ValueError("Only one of 'defaults', 'kwonlydefaults' or 'annotations' can be True simultaneously")
-                    elif param.default is not inspect._empty:
-                        if defaults and param.kind in (p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY):
-                            yield param.default
-                        elif kwonlydefaults and param.kind is p_kind.KEYWORD_ONLY:
-                            yield (arg_name, param.default)
-                    elif annotations and param.annotation is not inspect._empty:
-                        yield (arg_name, param.annotation)
-
-            arg_spec.args = tuple(_arg_spec_helper(p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY))
-            arg_spec.varargs = six.next(_arg_spec_helper(p_kind.VAR_POSITIONAL), None)
-            arg_spec.kwonlyargs = tuple(_arg_spec_helper(p_kind.KEYWORD_ONLY))
-            arg_spec.varkw = six.next(_arg_spec_helper(p_kind.VAR_KEYWORD), None)
-            arg_spec.keywords = arg_spec.varkw # getargspec compat
-            arg_spec.defaults = tuple(_arg_spec_helper(defaults=True))
-            arg_spec.kwonlydefaults = dict(_arg_spec_helper(kwonlydefaults=True))
-            arg_spec.annotations = dict(_arg_spec_helper(annotations=True))
-            if sig.return_annotation is not inspect._empty:
-                arg_spec.annotations['return'] = sig.return_annotation
+        # get arg_spec
+        arg_spec = _getfullargspec_p(decoratee)
 
         # parse dargs'n'dkwargs
         try:
@@ -256,10 +297,14 @@ def guard(*dargs, **dkwargs):
         if len(dargs) > len(arg_spec.args) or len(dkwargs) > len(arg_list):
             raise ValueError("Too many guard definitions for '%s()'" % decoratee.__name__)
 
-        if len(dargs) == 1 and (isinstance(dargs[0], RelGuard) or
-                (callable(dargs[0]) and not isinstance(dargs[0], GuardFunc))): # check if relguard is specified
+        if len(dargs) == 1 and isinstance(dargs[0], RelGuard): # check if relguard is specified
             rel_guard = dargs[0]
-            argument_guards = OrderedDict()
+            argument_guards = OrderedDict((arg, _) for arg in arg_spec.args) # might raise IndexError if empty
+            _already_bound = () # UnboundLocalError emerges if this is not defined.
+        elif len(dargs) == 1 and isinstance(dargs[0], types.FunctionType): # decorate directly (guards in annotations)
+            rel_guard = _
+            argument_guards = OrderedDict((arg, _) for arg in arg_spec.args) # might raise IndexError if empty
+            _already_bound = () # UnboundLocalError emerges if this is not defined.
         else:
             rel_guard = _
             # bind positionals to their names
@@ -274,14 +319,14 @@ def guard(*dargs, **dkwargs):
         # no overlaps, so extend argument_guards:
         argument_guards.update(dkwargs)
 
-        # if argument_guards is empty, try extracting guards from annotations
-        if not argument_guards:
+        # if argument_guards is empty (catch-all, more precisely), try extracting guards from annotations
+        if all(grd == _ for grd in argument_guards):
             try:
                 arg_annotations = arg_spec.annotations # raises AttributeError in py2
                 six.next(six.iterkeys(arg_annotations))
             except (AttributeError, # arg_spec was produced by getargspec (py2) thus we need to parse dargs'n'dkwargs
                     StopIteration): # or annotations are empty (py3)
-                raise ValueError("No guards specified for '%s()'" % decoratee.__name__)
+                pass
             else:
                 argument_guards = OrderedDict(
                         (arg_name, arg_annotations.get(arg_name, _)) # name -> annotation, or _ if no annotation.
@@ -292,10 +337,13 @@ def guard(*dargs, **dkwargs):
                 except KeyError:
                     rel_guard = _ # FIXME: what about mixed definitions? e.g. guards as annotations, relguard as decarg?
 
+        if (not argument_guards or all(grd is _ for grd in argument_guards)) and rel_guard is _:
+            raise ValueError("No guards specified for '%s()'" % decoratee.__name__)
+
         # check if guards are really guards, or at least callable.
         if rel_guard is not _ and not isinstance(rel_guard, RelGuard):
             if strict_guard_definitions:
-                raise ValueError("Specified relguard is not an instance of RelGuard")
+                raise ValueError("Specified relguard must be an instance of RelGuard, not %s" % type(rel_guard).__name__)
             else:
                 if not callable(rel_guard):
                     raise ValueError("Specified relguard is not callable")
@@ -305,20 +353,31 @@ def guard(*dargs, **dkwargs):
         for arg_name, grd in argument_guards.items():
             if grd is not _ and not isinstance(grd, GuardFunc):
                 if strict_guard_definitions:
-                    raise ValueError("Guard specified for argument '%s' is not an instance of GuardFunc" % arg_name)
+                    raise ValueError("Guard specified for argument '%s' must be an instance of GuardFunc, not %s"
+                            % (arg_name, type(grd).__name__))
                 else:
                     if not callable(grd):
                         raise ValueError("Guard specified for argument '%s' is not callable" % arg_name)
                     warnings.warn("Guard specified for argument '%s' is not an instance of GuardFunc. Its behaviour may be unexpected."
                             % arg_name, RuntimeWarning)
 
+        # check if relguard argument names fits with decoratee
+        if isinstance(rel_guard, RelGuard): # only RelGuard objects have __argnames__ attr.
+            for arg in rel_guard.__argnames__:
+                if arg not in arg_spec.args and arg not in arg_spec.kwonlyargs:
+                    raise ValueError("Relguard's argument names must be a subset of %s argument names" % decoratee.__name__)
+
         # check if defaults pass through guards
-        argument_defaults = dict(
-                zip(
-                    arg_spec.args[-len(arg_spec.defaults):], # slice of last elements. len(slice) == len(defaults)
-                    arg_spec.defaults
+        if arg_spec.defaults is not None:
+            argument_defaults = dict(
+                    zip(
+                        arg_spec.args[-len(arg_spec.defaults):], # slice of last elements. len(slice) == len(defaults)
+                        arg_spec.defaults
+                        )
                     )
-                )
+        else:
+            argument_defaults = dict()
+
         try:
             argument_defaults.update(dict(
                     zip(
@@ -337,6 +396,12 @@ def guard(*dargs, **dkwargs):
 
         @six.wraps(decoratee)
         def guarded(*args, **kwargs):
+
+            # check relations between args/environment first
+            bound_args = dict(zip(arg_spec.args[:len(args)], args)) # bind args to names
+            bound_args.update(kwargs)
+            if not rel_guard(**bound_args): # argument order in relguard is not guaranteed to match decoratee's
+                raise GuardError("Arguments did not pass through relguard")
 
             # check input args one by one
             for i, arg_value in enumerate(args):
@@ -360,6 +425,7 @@ def guard(*dargs, **dkwargs):
 
         ret = guarded
         ret._argument_guards = argument_guards
+        ret._relguard = rel_guard
         ret.__guarded__ = decoratee # keep reference to original function (FIXME: needed?)
         return ret
 
@@ -368,3 +434,6 @@ def guard(*dargs, **dkwargs):
         return decorator(dargs[0])
     else:
         return decorator
+
+def rguard(rel_guard, **kwargs):
+    return guard(RelGuard(rel_guard), **kwargs)

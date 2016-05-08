@@ -1,3 +1,4 @@
+import function_pattern_matching as fpm
 # annotations all
 @fpm.guard
 def ka3(

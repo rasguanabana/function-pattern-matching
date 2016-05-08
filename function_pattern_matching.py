@@ -70,13 +70,13 @@ def _getfullargspec_p(func):
                     yield arg_name
                 elif sum((defaults, kwonlydefaults, annotations)) > 1:
                     raise ValueError("Only one of 'defaults', 'kwonlydefaults' or 'annotations' can be True simultaneously")
+                elif annotations and param.annotation is not inspect._empty:
+                    yield (arg_name, param.annotation)
                 elif param.default is not inspect._empty:
                     if defaults and param.kind in (p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY):
                         yield param.default
                     elif kwonlydefaults and param.kind is p_kind.KEYWORD_ONLY:
                         yield (arg_name, param.default)
-                elif annotations and param.annotation is not inspect._empty:
-                    yield (arg_name, param.annotation)
 
         arg_spec.args = tuple(_arg_spec_helper((p_kind.POSITIONAL_OR_KEYWORD, p_kind.POSITIONAL_ONLY)))
         arg_spec.varargs = six.next(_arg_spec_helper((p_kind.VAR_POSITIONAL,)), None)

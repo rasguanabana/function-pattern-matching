@@ -131,3 +131,11 @@ def rwak3_bare(
     c: fpm.isoftype(float)
 ) -> lambda a, c: a == c:
     return (a, b, c)
+
+@fpm.guard
+def ad3(
+    a: fpm.isoftype(int),
+    b: fpm.isoftype(bool) =True,
+    c: fpm.Is(None) | fpm.gt(0) =None
+):
+    return (a, b, c)

@@ -431,6 +431,15 @@ class DoGuardsWork(unittest.TestCase):
         self.assertRaises(fpm.GuardError, rwsk3m, 9000, "x", 9000.1)
         self.assertRaises(fpm.GuardError, rwak3m, 'x', 'y', 'x')
 
+        # annotations + default values
+        self.assertEqual(ad3(2), (2, True, None))
+        self.assertEqual(ad3(2, False), (2, False, None))
+        self.assertEqual(ad3(2, c=10), (2, True, 10))
+        self.assertEqual(ad3(2, False, 11), (2, False, 11))
+        self.assertRaises(fpm.GuardError, ad3, 2.0)
+        self.assertRaises(fpm.GuardError, ad3, 1, [])
+        self.assertRaises(fpm.GuardError, ad3, 1, False, -1)
+
     def test_rguard_annotations(self):
         "Test every possible correct way of defining guards with rguard decorator (Py3 only)"
 
@@ -573,6 +582,7 @@ class IsDispatchCorrect():#unittest.TestCase):
     def test_with_catchall(self):
         "Test function defined with catch all case"
 
+        # all defaults
         @fpm.case
         def foo(a='bar', b=1337, c=(0, 1, 2)):
             return "str:bar, int:1337, tuple:(0, 1, 2)"
@@ -581,6 +591,7 @@ class IsDispatchCorrect():#unittest.TestCase):
         def foo(a='baz', b=1337, c=(0, 1, 2)):
             return "str:baz, int:1337, tuple:(0, 1, 2)"
 
+        # some defaults
         @fpm.case
         def foo(a, b=1331, c=(0, 1, 2)):
             return "any, int:1331, tuple:(0, 1, 2)"
@@ -589,14 +600,22 @@ class IsDispatchCorrect():#unittest.TestCase):
         def foo(a, b, c='baz'):
             return "any, any, str:baz"
 
-        @fpm.case(1, fpm._, fpm._) # equivalent, needed, when we want to match before non-default arg.
+        # decorator args, some
+        @fpm.case(1, fpm._, fpm._)
         def foo(a, b, c):
             return "int:1, any, any"
 
+        # _ in defaults
+        @fpm.case
+        def foo(a=fpm._, b=2, c=fpm._):
+            return "any, int:2, any"
+
+        # any/3
         @fpm.case
         def foo(a, b, c):
             return "any, any, any"
 
+        # any/4
         @fpm.case
         def foo(a, b, c, d): #different arity, but is that an issue?
             return "any, any, any, any"
@@ -609,6 +628,7 @@ class IsDispatchCorrect():#unittest.TestCase):
         self.assertEqual(foo('xyz', 1237, (0, 1, 2)), "any, any, any")
         self.assertEqual(foo('xyz', 1237, 'baz'), "any, any, str:baz")
         self.assertEqual(foo('bar', 1337, (0, 1, 2), True), "any, any, any, any")
+        self.assertEqual(foo([], 2, b''), "any, int:2, any")
 
     def test_factorial(self):
         "Erlang-like factorial"

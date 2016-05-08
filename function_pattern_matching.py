@@ -46,46 +46,6 @@ class _():
         return True
 _ = _() # we need just one and only one instance.
 
-# CASE #
-#
-#class Multi_function():
-#    def __init__(self):
-#        self.functions = list()
-#
-#    @staticmethod
-#    def __ismatching(arg_tuple, function_head):
-#        pass
-#
-#    def __call__(self, *args):
-#        # returns first matching head:
-#        function_body = next(
-#                (f.body for f in self.functions if __ismatching(args, f.head)), # generator finds only matching heads
-#                lambda: raise MatchError # default value, when next() hit StopIteration (generator was empty)
-#                )                        # so when no match was found, MatchError is raised.
-#        return function_body(*args) # execute and return result.
-#
-#    def append(self, *):
-#        pass
-#
-#
-#function_refs = defaultdict(lambda: defaultdict(Multi_function)) # needed for case to track multi-headed functions.
-#    # module name -> fun qualname -> Multi_function object
-#
-#def case(*args):
-#    "Main wrapper. *args can be pattern to match against, or directly a function head."
-#
-#    def decorator(decoratee, pattern=None):
-#        "Actual decorator. Registers function head (pattern) and corresponding function body."
-#
-#        # TODO: many try's to keep compat with py2.
-#        # needed:
-#        # - extract pattern from (case *args)/(fun arg defaults)/annotations
-#        # then:
-#        # - function_refs[module][fun_name].append(pattern, body), if no errors/exceptions.
-#
-#        params = inspect.signature(decoratee)
-#        # TODO: continue
-#
 # GUARDS #
 
 def _getfullargspec_p(func):
@@ -284,6 +244,9 @@ def guard(*dargs, **dkwargs):
     def decorator(decoratee):
         "Actual decorator."
 
+        # guard nesting is not allowed
+        if hasattr(decoratee, '__guarded__'):
+            raise ValueError("%s() has guards already set" % decoratee.__name__)
         # get arg_spec
         arg_spec = _getfullargspec_p(decoratee)
 
@@ -338,7 +301,7 @@ def guard(*dargs, **dkwargs):
             except AttributeError:
                 pass
 
-        if (not argument_guards or all(grd is _ for grd in argument_guards)) and rel_guard is _:
+        if (not argument_guards or all(grd is _ for grd in argument_guards.values())) and rel_guard is _:
             raise ValueError("No guards specified for '%s()'" % decoratee.__name__)
 
         # check if guards are really guards, or at least callable.
@@ -365,7 +328,7 @@ def guard(*dargs, **dkwargs):
         # check if relguard argument names fits with decoratee
         if isinstance(rel_guard, RelGuard): # only RelGuard objects have __argnames__ attr.
             for arg in rel_guard.__argnames__:
-                if arg not in arg_spec.args and arg not in arg_spec.kwonlyargs:
+                if arg not in arg_list:
                     raise ValueError("Relguard's argument names must be a subset of %s argument names" % decoratee.__name__)
 
         # get default arg vals
@@ -435,3 +398,35 @@ def raguard(decoratee):
         raise ValueError("raguard requires return annotation")
     else:
         return guard(RelGuard(rel_guard))(decoratee)
+
+# CASE #
+#
+#class MultiFunc():
+#    def __init__(self):
+#        self.functions = list()
+#
+#    def __call__(self, *args):
+#        pass
+#
+#    def append(self, *):
+#        pass
+#
+#
+#function_refs = defaultdict(lambda: defaultdict(Multi_function)) # needed for case to track multi-headed functions.
+#    # module name -> fun qualname -> Multi_function object
+#
+#def case(*args):
+#    "Main wrapper. *args can be pattern to match against, or directly a function head."
+#
+#    def decorator(decoratee, pattern=None):
+#        "Actual decorator. Registers function head (pattern) and corresponding function body."
+#
+#        # TODO: many try's to keep compat with py2.
+#        # needed:
+#        # - extract pattern from (case *args)/(fun arg defaults)/annotations
+#        # then:
+#        # - function_refs[module][fun_name].append(pattern, body), if no errors/exceptions.
+#
+#        params = inspect.signature(decoratee)
+#        # TODO: continue
+#

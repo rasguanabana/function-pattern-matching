@@ -124,3 +124,10 @@ def rwsk3ra(
     c
 ) -> lambda a, c: a == c:
     return (a, b, c)
+
+def rwak3_bare(
+    a: fpm.isoftype(int),
+    b: fpm.isoftype(str),
+    c: fpm.isoftype(float)
+) -> lambda a, c: a == c:
+    return (a, b, c)

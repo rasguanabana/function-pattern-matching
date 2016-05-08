@@ -480,42 +480,94 @@ class DoGuardsWork(unittest.TestCase):
     def test_guarded_definition_errors_decargs(self):
         "Test syntactically correct but erroneous guard definitions"
 
+        def decoratee_basic(a, b, c):
+            return (a, b, c)
         ## no relguard tests:
 
         # no guards
+        self.assertRaises(ValueError, fpm.guard, decoratee_basic) # @guard
+        self.assertRaises(ValueError, fpm.guard(), decoratee_basic) # @guard()
 
         # too many positionals
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue, fpm.eTrue, fpm.eTrue, fpm.eTrue), decoratee_basic) # @guard(....)
 
         # not known keyword arg
+        self.assertRaises(ValueError, fpm.guard(d=fpm.eTrue), decoratee_basic)
 
         # positional-keyword overlap (same)
+        self.assertRaises(ValueError, fpm.guard(fpm.eFalse, fpm.eFalse, a=fpm.eFalse), decoratee_basic)
+        self.assertRaises(ValueError, fpm.guard(fpm.eFalse, a=fpm.eFalse), decoratee_basic)
 
         # positional-keyword overlap (diff)
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue, fpm.eFalse, a=fpm.eFalse), decoratee_basic)
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue, a=fpm.eFalse), decoratee_basic)
 
         # not a guard
+        self.assertRaises(ValueError, fpm.guard(zip, list, all), decoratee_basic)
 
         ## with relguard tests:
 
         # not a relguard
+        try:
+            fpm.guard(lambda a, b, c: a and b and c)(decoratee_basic)
+        except ValueError:
+            pass
+        else:
+            self.fail("Expected ValueError")
 
         # wrong arg names in relguard
+        self.assertRaises(ValueError, fpm.guard(fpm.relguard(lambda a, v, x: a and v and x)), decoratee_basic)
 
         # exceeding arg names in relguard (good mixed with bad)
+        self.assertRaises(ValueError, fpm.guard(fpm.relguard(lambda a, b, c, x: a and b and c and x)), decoratee_basic)
 
-        # relguard with positionals
+        # relguard mixed with positionals
+        self.assertRaises(ValueError, fpm.guard(fpm.relguard(lambda: True), fpm.eq(0), fpm.eFalse, fpm.eFalse), decoratee_basic)
 
         # relguard with positionals as not 1st arg
+        self.assertRaises(ValueError, fpm.guard(fpm.eq(0), fpm.relguard(lambda: True), fpm.eFalse, fpm.eFalse), decoratee_basic)
 
         # defaults not passing through guards and relguard
+        #def decoratee_defaults(a, b=10, c=0):
+        #    return (a, b, c)
+
+        #assertRaises(ValueError, fpm.guard(fpm._, fpm.gt(100), fpm.eTrue)(decoratee_defaults))
 
         # var (kw)args
+        def decoratee_var1(*args):
+            return args
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue), decoratee_var1)
+
+        def decoratee_var2(a, *args):
+            return (a, args)
+        self.assertRaises(ValueError, fpm.guard(args=fpm.eTrue), decoratee_var2)
+
+        def decoratee_var3(**kwargs):
+            return kwargs
+        self.assertRaises(ValueError, fpm.guard(kwargs=fpm.eTrue), decoratee_var3)
+
+        def decoratee_var4(a, b, *args, **kwargs):
+            return (a, b, args, kwargs)
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue, fpm.eTrue, fpm.eTrue, fpm.eTrue), decoratee_var4)
 
         # guarding guarded
-        pass
+        @fpm.guard(fpm.ne(0))
+        def already_guarded(a):
+            return a
+        self.assertRaises(ValueError, fpm.guard(fpm.eTrue), already_guarded)
 
-    def test_guarded_definition_errors_annotations(self):
-        "Test syntactically correct but erroneous guard definitions"
-        pass
+        if py3:
+            # raguard, no return annotation
+            def nra(): pass
+            self.assertRaises(ValueError, fpm.raguard, nra)
+
+            # not erroneous, but annotations should be ignored if decorator arguments are specified
+            da_with_ann = fpm.guard(fpm.relguard(lambda a, c: a != c), a=~fpm.isoftype(int), b=~fpm.isoftype(str))(rwak3_bare)
+            self.assertRaises(fpm.GuardError, da_with_ann, 1, 'x', 1)
+            self.assertRaises(fpm.GuardError, da_with_ann, 1, 'x', 2)
+            self.assertRaises(fpm.GuardError, da_with_ann, 'x', 'y', 2)
+            self.assertEqual(da_with_ann('x', [], 2), ('x', [], 2))
+            self.assertIs(da_with_ann._argument_guards['c'], fpm._)
 
 class IsDispatchCorrect():#unittest.TestCase):
     def test_with_catchall(self):

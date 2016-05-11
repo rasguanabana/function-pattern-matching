@@ -1,9 +1,11 @@
 #TODO: test guards with default args
 #TODO: write test for erroneous
+import sys, os
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import function_pattern_matching as fpm
 import unittest
 try:
-    from test_fpm_py3 import *
+    from py3_defs import *
     py3 = True
 except SyntaxError:
     py3 = False
@@ -718,6 +720,26 @@ class IsDispatchCorrect(unittest.TestCase):
 
         # arg name mismatch
         self.assertRaises(ValueError, fpm.case(c=3, d=0), regular)
+
+    def test_dispatch(self):
+        "Test dispatch decorator" # TODO: improve test
+
+        @fpm.dispatch(int, float, str)
+        def dis(a, b, c):
+            return (1, a, b, c)
+
+        @fpm.dispatch(int, fpm._, int)
+        def dis(a, b, c):
+            return (2, a, b, c)
+
+        @fpm.dispatch
+        def dis(a=str, b=str, c=str):
+            return(3, a, b, c)
+
+        self.assertEqual(dis(1, 2.0, '3'),      (1, 1, 2.0, '3'))
+        self.assertEqual(dis(1, b'', 3),        (2, 1, b'', 3))
+        self.assertEqual(dis('1', '2', '3'),    (3, '1', '2', '3'))
+        self.assertRaises(fpm.MatchError, dis, '1', [], 0)
 
 if __name__ == '__main__':
     unittest.main()

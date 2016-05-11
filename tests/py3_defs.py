@@ -1,3 +1,7 @@
+"""
+This module contains syntax which works only with Python 3.
+Import will fail when calling test_fpm.py with Python 2 and those tests will be ommited.
+"""
 import function_pattern_matching as fpm
 # annotations all
 @fpm.guard

@@ -7,20 +7,26 @@ function-pattern-matching
 
 This module is both Python 2 and 3 compatible.
 
-<table of contents>
+.. contents:: Table of contents
 
 Introduction
 ============
 
-Two decorators are introduced:
+Two families of decorators are introduced:
 
 - ``case``: allows multiple function clause definitions and dispatches to correct one. Dispatch happens on the values
   of call arguments or, more generally, when call arguments' values match specified guard definitions.
+  - ``dispatch``: convenience decorator for dispatching on argument types. Equivalent to using ``case`` and ``guard``
+    with type checking.
 - ``guard``: allows arguments' values filtering and raises ``GuardError`` when argument value does not pass through
   argument guard.
+  - ``rguard``: Wrapper for ``guard`` which converts first positional decorator argument to relguard. See `example`_.
+  - ``raguard``: Like ``rguard``, but converts return annotation. See `example`_.
 
 Usage example:
+
 - All Python versions:
+
 .. code-block:: python
 
     import function_pattern_matching as fpm
@@ -35,6 +41,7 @@ Usage example:
         return n * factorial(n - 1)
 
 - Python 3 only:
+
 .. code-block:: python
 
     import function_pattern_matching as fpm
@@ -113,7 +120,9 @@ Although it is not advised, you can create your own guards:
 - by writing a function that returns a ``GuardFunc`` object initialised with a test function.
 
 Note that a test function must have only one positional argument.
+
 Examples:
+
 .. code-block:: python
 
     # use decorator
@@ -142,12 +151,15 @@ There are two ways of defining guards:
 
 - As decorator arguments
   - positionally: guards order will match decoratee's (the function being decorated) arguments order.
+
     .. code-block:: python
 
         @fpm.guard(fpm.isoftype(int) & fpm.ge(0), fpm.isiterable)
         def func(number, iterable):
             pass
+
   - as keyword arguments: e.g. guard under name *a* will guard decoratee's argument named *a*.
+
     .. code-block:: python
 
         @fpm.guard(
@@ -156,7 +168,9 @@ There are two ways of defining guards:
         )
         def func(number, iterable):
             pass
+
 - As annotations (Python 3 only)
+
   .. code-block:: python
 
       @fpm.guard

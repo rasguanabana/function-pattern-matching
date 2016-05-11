@@ -430,7 +430,7 @@ function_refs = defaultdict(lambda: defaultdict(MultiFunc)) # needed for case to
 def case(*dargs, **dkwargs):
     ""
 
-    def decorator(decoratee, pattern=None):
+    def decorator(decoratee):
         ""
 
         # get arg_spec
@@ -441,6 +441,12 @@ def case(*dargs, **dkwargs):
 
         # different arities, seperate dispatch lists, so we need to count args
         clause_arity = len(arg_spec.args)
+
+        # what guard should we wrap args with
+        if hasattr(decoratee, '__dispatch__'): # called by dispatch decorator
+            grd_wrap = isoftype
+        else:
+            grd_wrap = eq
 
         # only positional and positional_or_kw args allowed
         if arg_spec.varargs or arg_spec.keywords:
@@ -482,14 +488,14 @@ def case(*dargs, **dkwargs):
         elif hasattr(decoratee, '__guarded__'): # decoratee is already guarded; extend guards
             for arg_name, match in match_vals.items():
                 if match is not _:
-                    match = eq(match)
+                    match = grd_wrap(match) # eq or isoftype
                 try:
                     decoratee._argument_guards[arg_name] = match & decoratee._argument_guards[arg_name]
                 except KeyError:
                     decoratee._argument_guards[arg_name] = match
         else:
             _guards = match_vals.copy()
-            _guards.update({k: eq(v) for k, v in match_vals.items() if v is not _})
+            _guards.update({k: grd_wrap(v) for k, v in match_vals.items() if v is not _})
             decoratee = guard(**_guards)(decoratee)
 
         # add to function_refs
@@ -508,3 +514,18 @@ def case(*dargs, **dkwargs):
         return decorator(dargs[0])
     else:
         return decorator
+
+def dispatch(*dargs, **dkwargs):
+
+    def direct(decoratee):
+        decoratee.__dispatch__ = True # this will intruct case to wrap args in isoftype.
+        return case(decoratee)
+
+    def indirect(decoratee):
+        decoratee.__dispatch__ = True
+        return case(*dargs, **dkwargs)(decoratee)
+
+    if len(dkwargs) == 0 and len(dargs) == 1 and callable(dargs[0]):
+        return direct(dargs[0])
+    else:
+        return indirect

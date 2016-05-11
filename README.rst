@@ -7,6 +7,8 @@ function-pattern-matching
 
 This module is both Python 2 and 3 compatible.
 
+.. warning:: Readme and docs under construction.
+
 .. contents:: Table of contents
 
 Introduction

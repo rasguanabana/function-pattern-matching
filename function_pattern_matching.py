@@ -460,12 +460,17 @@ def case(*dargs, **dkwargs):
             arg_defaults = dict()
 
         # parse dargs'n'dkwargs
-        if (dargs or dkwargs) and dargs[0] is not decoratee:
+        if (dargs and dargs[0] is not decoratee) or dkwargs:
             if arg_defaults:
                 raise ValueError("Default args are not allowed when pattern is specified as decorator arguments")
+
+            # check if correct (names and count)
             for dkey in dkwargs:
                 if dkey not in arg_spec.args:
                     raise ValueError("Function %s() has no argument '%s'" % (decoratee.__name__, dkey))
+            if len(dargs) > clause_arity:
+                raise ValueError("Pattern must have at most %i values, found %i" % (clause_arity, len(dargs)))
+
             match_vals = dict(zip(arg_spec.args[:len(dargs)], dargs))
             match_vals.update(dkwargs)
         else: # direct decorator or with empty args:

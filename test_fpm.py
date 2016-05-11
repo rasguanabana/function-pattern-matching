@@ -585,50 +585,50 @@ class IsDispatchCorrect(unittest.TestCase):
         # all defaults
         @fpm.case
         def foo(a='bar', b=1337, c=(0, 1, 2)):
-            return "str:bar, int:1337, tuple:(0, 1, 2)"
+            return (1, a, b, c)
 
         @fpm.case
         def foo(a='baz', b=1337, c=(0, 1, 2)):
-            return "str:baz, int:1337, tuple:(0, 1, 2)"
+            return (2, a, b, c)
 
         # some defaults
         @fpm.case
         def foo(a, b=1331, c=(0, 1, 2)):
-            return "any, int:1331, tuple:(0, 1, 2)"
+            return (3, a, b, c)
 
         @fpm.case
         def foo(a, b, c='baz'):
-            return "any, any, str:baz"
+            return (4, a, b, c)
 
         # decorator args, some
         @fpm.case(1, fpm._, fpm._)
         def foo(a, b, c):
-            return "int:1, any, any"
+            return (5, a, b, c)
 
         # _ in defaults
         @fpm.case
         def foo(a=fpm._, b=2, c=fpm._):
-            return "any, int:2, any"
+            return (6, a, b, c)
 
         # any/3
         @fpm.case
         def foo(a, b, c):
-            return "any, any, any"
+            return (7, a, b, c)
 
         # any/4
         @fpm.case
         def foo(a, b, c, d): #different arity, but is that an issue?
-            return "any, any, any, any"
+            return (8, a, b, c, d)
 
-        self.assertEqual(foo('bar', 1337, (0, 1, 2)), "str:bar, int:1337, tuple:(0, 1, 2)")
-        self.assertEqual(foo('baz', 1337, (0, 1, 2)), "str:baz, int:1337, tuple:(0, 1, 2)")
-        self.assertEqual(foo('xyz', 1337, (0, 1, 2)), "any, any, any")
-        self.assertEqual(foo('xyz', 1331, (0, 1, 2)), "any, int:1331, tuple:(0, 1, 2)")
-        self.assertEqual(foo(1, dict(), False), "int:1, any, any")
-        self.assertEqual(foo('xyz', 1237, (0, 1, 2)), "any, any, any")
-        self.assertEqual(foo('xyz', 1237, 'baz'), "any, any, str:baz")
-        self.assertEqual(foo('bar', 1337, (0, 1, 2), True), "any, any, any, any")
-        self.assertEqual(foo([], 2, b''), "any, int:2, any")
+        self.assertEqual(foo('bar', 1337, (0, 1, 2)),       (1, 'bar', 1337, (0, 1, 2)))
+        self.assertEqual(foo('baz', 1337, (0, 1, 2)),       (2, 'baz', 1337, (0, 1, 2)))
+        self.assertEqual(foo('xyz', 1331, (0, 1, 2)),       (3, 'xyz', 1331, (0, 1, 2)))
+        self.assertEqual(foo('xyz', 1237, 'baz'),           (4, 'xyz', 1237, 'baz'))
+        self.assertEqual(foo(1, dict(), False),             (5, 1, dict(), False))
+        self.assertEqual(foo([], 2, b''),                   (6, [], 2, b''))
+        self.assertEqual(foo('xyz', 1337, (0, 1, 2)),       (7, 'xyz', 1337, (0, 1, 2)))
+        self.assertEqual(foo('xyz', 1237, (0, 1, 2)),       (7, 'xyz', 1237, (0, 1, 2)))
+        self.assertEqual(foo('bar', 1337, (0, 1, 2), True), (8, 'bar', 1337, (0, 1, 2), True))
 
     def test_factorial(self):
         "Erlang-like factorial"
@@ -685,6 +685,39 @@ class IsDispatchCorrect(unittest.TestCase):
         self.assertEqual(fib(9), 34)
         self.assertEqual(fib(10), 55)
         self.assertEqual(fib(11), 89)
+
+    def test_bad_case_defs(self):
+        "Syntactically correct, but erroneous multi-clause functions definitions."
+
+        # varargs
+        def varargs(a, b, *c):
+            return (1, a, b, c)
+
+        self.assertRaises(ValueError, fpm.case(1, 2, ()), varargs)
+
+        def varargs(a, b, **c):
+            return (2, a, b, c)
+
+        self.assertRaises(ValueError, fpm.case(1, 2, {}), varargs)
+
+        # kwonly
+        if py3:
+            self.assertRaises(ValueError, fpm.case(a=1, b=2, c=3), kwonly)
+
+        # decorator args and defaults
+        def decdef(a=1, b=2, c=3):
+            return (3, a, b, c)
+
+        self.assertRaises(ValueError, fpm.case(1, 2, 3), decdef)
+
+        # exceeding positionals
+        def regular (a, b, c):
+            return (4, a, b, c)
+
+        self.assertRaises(ValueError, fpm.case(1, 2, 3, 4), regular)
+
+        # arg name mismatch
+        self.assertRaises(ValueError, fpm.case(c=3, d=0), regular)
 
 if __name__ == '__main__':
     unittest.main()

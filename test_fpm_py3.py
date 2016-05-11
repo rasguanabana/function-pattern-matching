@@ -139,3 +139,6 @@ def ad3(
     c: fpm.Is(None) | fpm.gt(0) =None
 ):
     return (a, b, c)
+
+def kwonly(a, b, *, c):
+    return (a, b, c)

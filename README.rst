@@ -7,7 +7,7 @@ function-pattern-matching
 
 This module is both Python 2 and 3 compatible.
 
-.. warning:: Readme and docs under construction.
+**Warning:** Readme and docs under construction.
 
 .. contents:: Table of contents
 
@@ -18,12 +18,16 @@ Two families of decorators are introduced:
 
 - ``case``: allows multiple function clause definitions and dispatches to correct one. Dispatch happens on the values
   of call arguments or, more generally, when call arguments' values match specified guard definitions.
+
   - ``dispatch``: convenience decorator for dispatching on argument types. Equivalent to using ``case`` and ``guard``
     with type checking.
+
 - ``guard``: allows arguments' values filtering and raises ``GuardError`` when argument value does not pass through
   argument guard.
-  - ``rguard``: Wrapper for ``guard`` which converts first positional decorator argument to relguard. See `example`_.
-  - ``raguard``: Like ``rguard``, but converts return annotation. See `example`_.
+
+  - ``rguard``: Wrapper for ``guard`` which converts first positional decorator argument to relguard. See Relguards_.
+
+  - ``raguard``: Like ``rguard``, but converts return annotation. See Relguards_.
 
 Usage example:
 
@@ -59,13 +63,13 @@ Usage example:
 
 Of course that's a poor implementation of factorial, but illustrates the idea in a simple way.
 
-.. note::
+**Note:** This module does not aim to be used on production scale or in a large sensitive application (but I'd be
+happy if someone decided to use it in his/her project). I think of it more as a fun project which shows how
+flexible Python can be (and as a good training for myself).
 
-    This module does not aim to be used on production scale or in a large sensitive application. I think of it more
-    as a fun project which shows how flexible Python can be (and as a good training :)
-
-    I'm aware that it's somewhat against duck typing and EAFP philosophy employed by the language, but obviously there
-    *are* some cases when preliminary checks are useful and make code (and life) much simpler.
+I'm aware that it's somewhat against duck typing and EAFP (easier to ask for forgiveness than for permission)
+philosophy employed by the language, but obviously there *are* some cases when preliminary checks are useful and
+make code (and life) much simpler.
 
 Installation
 ============
@@ -93,6 +97,8 @@ will not work.
 ``GuardFunc`` objects can be negated with ``~`` and combined together with ``&``, ``|`` and ``^`` logical operators.
 Note however, that *xor* isn't very useful here.
 
+**Note:** It is not possible to put guards on varying arguments (\*args, \**kwargs).
+
 List of provided guard functions
 ................................
 
@@ -117,8 +123,10 @@ checked.
 Custom guards
 .............
 
-Although it is not advised, you can create your own guards:
+Although it is not advised (at least for simple checks), you can create your own guards:
+
 - by using ``makeguard`` decorator on your test function.
+
 - by writing a function that returns a ``GuardFunc`` object initialised with a test function.
 
 Note that a test function must have only one positional argument.
@@ -144,7 +152,8 @@ Examples:
 The above two are very similar, but the second one allows creating function which takes multiple arguments to construct
 actual guard.
 
-.. note:: It is not recommended to create your own guard functions. Use combinations of the ones shipped with fpm.
+**Note:** It is not recommended to create your own guard functions. In most cases combinations of the ones shipped with
+fpm should be all you need.
 
 Define guards for function arguments
 ....................................
@@ -152,7 +161,8 @@ Define guards for function arguments
 There are two ways of defining guards:
 
 - As decorator arguments
-  - positionally: guards order will match decoratee's (the function being decorated) arguments order.
+
+  - positionally: guards order will match decoratee's (the function that is to be decorated) arguments order.
 
     .. code-block:: python
 
@@ -165,7 +175,7 @@ There are two ways of defining guards:
     .. code-block:: python
 
         @fpm.guard(
-            name = fpm.isoftype(int) & fpm.ge(0),
+            number = fpm.isoftype(int) & fpm.ge(0),
             iterable = fpm.isiterable
         )
         def func(number, iterable):
@@ -182,26 +192,230 @@ There are two ways of defining guards:
       ): # this is NOT an emoticon
           pass
 
-Relguard
---------
+If you try to declare guards using both methods at once, then annotations get ignored and are left untouched.
+
+Relguards
+---------
+
+Relguard is a kind of guard that checks relations between arguments (and/or external variables). ``fpm`` implements
+them as functions (wrapped in ``RelGuard`` object) whose arguments are a subset of decoratee's arguments (no arguments
+is fine too).
 
 Define relguard
 ...............
 
+There are a few ways of defining a relguard.
+
+- Using ``guard`` with the first (and only) positional non-keyword argument of type ``RelGuard``:
+
+  .. code-block:: python
+
+      @fpm.guard(
+          fpm.relguard(lambda a, c: a == c), # converts lambda to RelGuard object in-place
+          a = fpm.isoftype(int) & fpm.eTrue,
+          b = fpm.Isnot(None)
+      )
+      def func(a, b, c):
+          pass
+
+- Using ``guard`` with the return annotation holding a ``RelGuard`` object (Python 3 only):
+
+  .. code-block:: python
+
+      @fpm.guard
+      def func(a, b, c) -> fpm.relguard(lambda a, b, c: a != b and b < c):
+          pass
+
+- Using ``rguard`` with a regular callable as the first (and only) positional non-keyword argument.
+
+  .. code-block:: python
+
+      @fpm.rguard(
+          lambda a, c: a == c, # rguard will try converting this to RelGuard object
+          a = fpm.isoftype(int) & fpm.eTrue,
+          b = fpm.Isnot(None)
+      )
+      def func(a, b, c):
+          pass
+
+- Using ``raguard`` with a regular callable as the return annotation.
+
+  .. code-block:: python
+
+      @fpm.raguard
+      def func(a, b, c) -> lambda a, b, c: a != b and b < c: # raguard will try converting lambda to RelGuard object
+          pass
+
+As you can see, when using ``guard`` you have to manually convert functions to ``RelGuard`` objects with ``relguard``
+method. By using ``rguard`` or ``raguard`` decorators you don't need to do it by yourself, and you get a bit cleaner
+definition.
+
 Multiple function clauses
 -------------------------
+
+With ``case`` decorator you are able to define multiple clauses of the same function.
+
+When such a function is called with some arguments, then the first matching clause will be executed. Matching clause
+will be the one that didn't raise a ``GuardError`` when called with given arguments.
+
+**Note:** using ``case`` or ``dispatch`` (discussed later) disables default functionality of default argument values.
+Functions with varying arguments (\*args, \**kwargs) and keyword-only arguments (py3-only) are not supported.
+
+Example:
+
+.. code-block:: python
+
+    @fpm.case
+    def func(a=0): print("zero!")
+
+    @fpm.case
+    def func(a=1): print("one!")
+
+    @fpm.case
+    @fpm.guard(fpm.gt(9000))
+    def func(a): print("IT'S OVER 9000!!!")
+
+    @fpm.case
+    def func(a): print("some var:", a) # catch-all clause
+
+    >>> func(0)
+    'zero!'
+    >>> func(1)
+    'one!'
+    >>> func(9000.1)
+    "IT'S OVER 9000!!!"
+    >>> func(1337)
+    'some var: 1337'
+
+If no clause match, then ``MatchError`` is raised. Above example has a catch-all clause, so ``MatchError`` will never
+occur.
+
+Different arities (argument count) are allowed and are dispatched separetely
+
+Example:
+
+.. code-block:: python
+
+    @fpm.case
+    def func(a=1, b=1, c):
+        return 1
+
+    @fpm.case
+    def func(a, b, c):
+        return 2
+
+    @fpm.case
+    def func(a=1, b=1, c, d):
+        return 3
+
+    @fpm.case
+    def func(a, b, c, d):
+        return 4
+
+    >>> func(1, 1, 'any')
+    1
+    >>> func(1, 0, 0.5)
+    2
+    >>> func(1, 1, '', '')
+    3
+    >>> func(1, 0, 0, '')
+    4
+
+As you can see, clause order matters only for same-arity clauses. 4-arg catch-all does not affect any 3-arg definition.
+
+Define multi-claused functions
+..............................
+
+There are three ways of defining a pattern for a function clause:
+
+- Specify exact values as decorator arguments (positional and/or keyword)
+
+  .. code-block:: python
+
+      @fpm.case(1, 2, 3)
+      def func(a, b, c):
+          pass
+      
+      @fpm.case(1, fpm._, 0)
+      def func(a, b, c):
+          pass
+
+      @fpm.case(b=10)
+      def func(a, b, c):
+          pass
+
+- Specify exact values as default arguments
+
+  .. code-block:: python
+
+      @fpm.case
+      def func(a=0):
+          pass
+
+      @fpm.case
+      def func(a=10):
+          pass
+
+      @fpm.case
+      def func(a=fpm._, b=3):
+          pass
+
+- Specify guards for clause to match
+
+  .. code-block:: python
+
+      @fpm.case
+      @fpm.guard(fpm.eq(0) & ~fpm.isoftype(float))
+      def func(a):
+          pass
+
+      @fpm.case
+      @fpm.guard(fpm.gt(0))
+      def func(a):
+          pass
+
+      @fpm.case
+      @fpm.guard(fpm.Is(None))
+      def func(a):
+          pass
+
+``dispatch`` decorator
+......................
+
+``dispatch`` decorator is similar to ``case``, but it lets you to define argument types to match against. You can
+specify types either as decorator arguments or default values (or as guards, of course, but it makes using ``dispatch``
+pointless).
+
+Example:
+
+.. code-block:: python
+
+    @fpm.dispatch(int, int)
+    def func(a, b):
+        print("integers")
+
+    @fpm.dispatch
+    def func(a=float, b=float):
+        print("floats")
+
+    >>> func(1, 1)
+    'integers'
+    >>> func(1.0, 1.0)
+    'floats'
 
 Examples (the useful ones)
 ==========================
 
+Working on it!
+
 Similar solutions
 =================
 
-- singledispatch from functools
-- pyfpm
+- `singledispatch<https://docs.python.org/3/library/functools.html#functools.singledispatch>`_ from functools
+- `pyfpm<https://github.com/martinblech/pyfpm>`_
+- `patmatch<http://svn.colorstudy.com/home/ianb/recipes/patmatch.py>`_
 - http://blog.chadselph.com/adding-functional-style-pattern-matching-to-python.html
-- http://svn.colorstudy.com/home/ianb/recipes/patmatch.py
-- http://www.artima.com/weblogs/viewpost.jsp?thread=101605 (Guido)
+- http://www.artima.com/weblogs/viewpost.jsp?thread=101605 (by Guido van Rossum, BDFL)
 
 License
 =======

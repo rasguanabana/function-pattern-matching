@@ -578,7 +578,7 @@ class DoGuardsWork(unittest.TestCase):
             self.assertEqual(da_with_ann('x', [], 2), ('x', [], 2))
             self.assertIs(da_with_ann._argument_guards['c'], fpm._)
 
-class IsDispatchCorrect():#unittest.TestCase):
+class IsDispatchCorrect(unittest.TestCase):
     def test_with_catchall(self):
         "Test function defined with catch all case"
 
@@ -633,19 +633,19 @@ class IsDispatchCorrect():#unittest.TestCase):
     def test_factorial(self):
         "Erlang-like factorial"
 
-        # no accumulator, because this is just for a testing sake, not performance.
+        # no accumulator, because this is just for a testing, not performance.
 
         @fpm.case
         def fac(n=0):
             return 1
 
         @fpm.case
-        @fpm.guard(fpm.ge(0) & fpm.is_int)
+        @fpm.guard(fpm.ge(0) & fpm.isoftype(int))
         def fac(n):
             return n * fac(n-1)
 
-        self.assertRaises(fpm.GuardError, fac, -1)
-        self.assertRaises(fpm.GuardError, fac, 'not an int')
+        self.assertRaises(fpm.MatchError, fac, -1)
+        self.assertRaises(fpm.MatchError, fac, 'not an int')
 
         self.assertEqual(fac(0), 1)
         self.assertEqual(fac(1), 1)
@@ -660,7 +660,7 @@ class IsDispatchCorrect():#unittest.TestCase):
     def test_fibonacci(self):
         "Erlang-like fibonacci"
 
-        # no accumulator, because this is just for a testing sake, not performance.
+        # no accumulator, because this is just for a testing, not performance.
 
         @fpm.case
         def fib(n=0):
@@ -675,7 +675,7 @@ class IsDispatchCorrect():#unittest.TestCase):
         def fib(n):
             return fib(n-1) + fib(n-2)
 
-        self.assertRaises(fpm.GuardError, fib, -1)
+        self.assertRaises(fpm.MatchError, fib, -1)
 
         self.assertEqual(fib(0), 0)
         self.assertEqual(fib(1), 1)

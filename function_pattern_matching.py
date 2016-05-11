@@ -400,33 +400,106 @@ def raguard(decoratee):
         return guard(RelGuard(rel_guard))(decoratee)
 
 # CASE #
-#
-#class MultiFunc():
-#    def __init__(self):
-#        self.functions = list()
-#
-#    def __call__(self, *args):
-#        pass
-#
-#    def append(self, *):
-#        pass
-#
-#
-#function_refs = defaultdict(lambda: defaultdict(Multi_function)) # needed for case to track multi-headed functions.
-#    # module name -> fun qualname -> Multi_function object
-#
-#def case(*args):
-#    "Main wrapper. *args can be pattern to match against, or directly a function head."
-#
-#    def decorator(decoratee, pattern=None):
-#        "Actual decorator. Registers function head (pattern) and corresponding function body."
-#
-#        # TODO: many try's to keep compat with py2.
-#        # needed:
-#        # - extract pattern from (case *args)/(fun arg defaults)/annotations
-#        # then:
-#        # - function_refs[module][fun_name].append(pattern, body), if no errors/exceptions.
-#
-#        params = inspect.signature(decoratee)
-#        # TODO: continue
-#
+
+class MultiFunc():
+    def __init__(self):
+        self.clauses = defaultdict(list) # seperate lists for different arities
+        self.__name__ = None
+
+    def __call__(self, *args, **kwargs):
+        for clause in self.clauses[len(args) + len(kwargs)]:
+            try:
+                return clause(*args, **kwargs) # call first matching function clause
+            except GuardError:
+                pass
+        # no hit, raise
+        raise MatchError("No match for given argument values")
+
+    def append(self, arity, clause):
+        if self.clauses.get(arity, False) and hasattr(self.clauses[-1], '__catchall__'):
+            raise WontMatchError("Function clause defined after a catch-all clause")
+
+        self.clauses[arity].append(clause)
+        if not self.__name__:
+            self.__name__ = clause.__name__
+
+
+function_refs = defaultdict(lambda: defaultdict(MultiFunc)) # needed for case to track multi-headed functions.
+    # module name -> fun (qual)name -> MultiFunc object
+
+def case(*dargs, **dkwargs):
+    ""
+
+    def decorator(decoratee, pattern=None):
+        ""
+
+        # get arg_spec
+        try:
+            arg_spec = _getfullargspec_p(decoratee.__guarded__)
+        except AttributeError:
+            arg_spec = _getfullargspec_p(decoratee)
+
+        # different arities, seperate dispatch lists, so we need to count args
+        clause_arity = len(arg_spec.args)
+
+        # only positional and positional_or_kw args allowed
+        if arg_spec.varargs or arg_spec.keywords:
+            raise ValueError("Functions with varying arguments unsupported")
+        if getattr(arg_spec, 'kwonlyargs', False):
+            raise ValueError("Functions with keyword-only arguments unsupported")
+
+        # read defaults
+        if arg_spec.defaults is not None:
+            arg_defaults = dict(
+                    zip(
+                        arg_spec.args[-len(arg_spec.defaults):],
+                        arg_spec.defaults
+                    )
+                )
+        else:
+            arg_defaults = dict()
+
+        # parse dargs'n'dkwargs
+        if (dargs or dkwargs) and dargs[0] is not decoratee:
+            if arg_defaults:
+                raise ValueError("Default args are not allowed when pattern is specified as decorator arguments")
+            for dkey in dkwargs:
+                if dkey not in arg_spec.args:
+                    raise ValueError("Function %s() has no argument '%s'" % (decoratee.__name__, dkey))
+            match_vals = dict(zip(arg_spec.args[:len(dargs)], dargs))
+            match_vals.update(dkwargs)
+        else: # direct decorator or with empty args:
+            match_vals = arg_defaults or dict() # will be dict() if arg_defaults is None
+
+        # set guards on decoratee
+        if not match_vals and not hasattr(decoratee, '__guarded__'): # this is a catch-all! no need for guarding this clause
+            decoratee.__catchall__ = True
+        elif hasattr(decoratee, '__guarded__'): # decoratee is already guarded; extend guards
+            for arg_name, match in match_vals.items():
+                if match is not _:
+                    match = eq(match)
+                try:
+                    decoratee._argument_guards[arg_name] = match & decoratee._argument_guards[arg_name]
+                except KeyError:
+                    decoratee._argument_guards[arg_name] = match
+        else:
+            _guards = match_vals.copy()
+            _guards.update({k: eq(v) for k, v in match_vals.items() if v is not _})
+            decoratee = guard(**_guards)(decoratee)
+
+        # add to function_refs
+        try:
+            decoratee_name = decoratee.__qualname__ # py>=3.3
+        except AttributeError:
+            decoratee_name = decoratee.__name__
+
+        function_refs[decoratee.__module__][decoratee_name].append(clause_arity, decoratee)
+
+        # return MultiFunc object
+        return function_refs[decoratee.__module__][decoratee_name]
+
+    # decide whether initialise decorator
+    if len(dkwargs) == 0 and len(dargs) == 1 and callable(dargs[0]):
+        return decorator(dargs[0])
+    else:
+        return decorator

@@ -1,8 +1,8 @@
 function-pattern-matching
 *************************
 
-**function-pattern-matching** is a module which introduces Erlang-style `multiple clause defined functions
-<http://erlang.org/doc/reference_manual/functions.html>`_ and
+**function-pattern-matching** (**fpm** for short) is a module which introduces Erlang-style
+`multiple clause defined functions <http://erlang.org/doc/reference_manual/functions.html>`_ and
 `guard sequences <http://erlang.org/doc/reference_manual/functions.html#id77457>`_.
 
 This module is both Python 2 and 3 compatible.

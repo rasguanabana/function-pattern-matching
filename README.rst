@@ -411,9 +411,9 @@ Working on it!
 Similar solutions
 =================
 
-- `singledispatch<https://docs.python.org/3/library/functools.html#functools.singledispatch>`_ from functools
-- `pyfpm<https://github.com/martinblech/pyfpm>`_
-- `patmatch<http://svn.colorstudy.com/home/ianb/recipes/patmatch.py>`_
+- `singledispatch <https://docs.python.org/3/library/functools.html#functools.singledispatch>`_ from functools
+- `pyfpm <https://github.com/martinblech/pyfpm>`_
+- `patmatch <http://svn.colorstudy.com/home/ianb/recipes/patmatch.py>`_
 - http://blog.chadselph.com/adding-functional-style-pattern-matching-to-python.html
 - http://www.artima.com/weblogs/viewpost.jsp?thread=101605 (by Guido van Rossum, BDFL)
 

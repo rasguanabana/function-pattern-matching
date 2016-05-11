@@ -108,6 +108,11 @@ def _getparams(func):
     return args + varargs + kwonlyargs + varkw
 
 class GuardFunc():
+    """
+    Class for guard functions. It checks if function to wrap is defined correctly, returns boolean, doesn't raise
+    unwanted TypeErrors and allows creating new guards by combining then with logical operators.
+    """
+
     def __init__(self, test):
         if not callable(test):
             raise ValueError("Guard test has to be callable")
@@ -128,6 +133,8 @@ class GuardFunc():
         self.test = lambda inp: apply_try_conv_to_bool(test, inp)
 
     def _isotherguard(method):
+        """Checks if `other` is a GuardFunc object."""
+
         @six.wraps(method)
         def checks(self, other):
             if not isinstance(other, GuardFunc):
@@ -137,55 +144,80 @@ class GuardFunc():
         return checks
 
     def __invert__(self):
+        """
+        ~ operator
+        """
         return GuardFunc(lambda inp: not self.test(inp))
 
     @_isotherguard
     def __and__(self, other):
+        """
+        & operator
+        """
         return GuardFunc(lambda inp: (self.test(inp) & other.test(inp)))
 
     @_isotherguard
     def __or__(self, other):
+        """
+        | operator
+        """
         return GuardFunc(lambda inp: (self.test(inp) | other.test(inp)))
 
     @_isotherguard
     def __xor__(self, other):
+        """
+        ^ operator
+        """
         return GuardFunc(lambda inp: (self.test(inp) ^ other.test(inp)))
 
     def __call__(self, inp):
+        """Forward call to `self.test`"""
         return self.test(inp)
 
     def __bool__(self):
+        """Handle conversion to boolean (py3)"""
         return self.__call__()
     def __nonzero__(self):
+        """Handle conversion to boolean (py2)"""
         return self.__call__()
 
 def makeguard(decoratee):
-    "Decorator"
+    "Decorator which turns decoratee to GuardFunc object."
     return GuardFunc(decoratee)
 
 def eq(val):
+    "Is inp equal to val."
     return GuardFunc(lambda inp: inp == val)
 def ne(val):
+    "Is inp not equal to val."
     return GuardFunc(lambda inp: inp != val)
 def lt(val):
+    "Is inp less than val."
     return GuardFunc(lambda inp: inp < val)
 def le(val):
+    "Is inp less than or equal to val."
     return GuardFunc(lambda inp: inp <= val)
 def gt(val):
+    "Is inp greater than val."
     return GuardFunc(lambda inp: inp > val)
 def ge(val):
+    "Is inp greater than or equal to val"
     return GuardFunc(lambda inp: inp >= val)
 
 def Is(val):
+    "Is inp the same object as val."
     return GuardFunc(lambda inp: inp is val)
 def Isnot(val):
+    "Is inp different object than val."
     return GuardFunc(lambda inp: inp is not val)
 
 def isoftype(type_):
+    "Is inp an instance of type_."
     return GuardFunc(lambda inp: isinstance(inp, type_))
 
 @makeguard
 def isiterable(inp):
+    "Is inp iterable"
     try:
         iter(inp)
     except TypeError:
@@ -195,21 +227,29 @@ def isiterable(inp):
 
 @makeguard
 def eTrue(inp):
+    "Does inp evaluate to True."
     return bool(inp)
 
 @makeguard
 def eFalse(inp):
+    "Does inp evaluate to False."
     return not bool(inp)
 
 def In(val):
+    "Is inp in val"
     _ in val # simple test for in support
     return GuardFunc(lambda inp: inp in val)
 def notIn(val):
+    "Is inp not in val"
     _ in val # simple test for in support
     return GuardFunc(lambda inp: inp not in val)
 
 
 class RelGuard():
+    """
+    Class for relguard functions. It checks if test function is defined correctly, exposes its signature to the `guard`
+    decorator and passes only the needed arguments to test function when the guarded function is called.
+    """
     def __init__(self, test):
         if not callable(test):
             raise ValueError("Relguard test has to be callable")
@@ -234,7 +274,7 @@ class RelGuard():
             return False
 
 def relguard(decoratee):
-    "Decorator"
+    "Decorator which turns decoratee to RelGuard object."
     return RelGuard(decoratee)
 
 
@@ -354,6 +394,10 @@ def guard(*dargs, **dkwargs):
 
         @six.wraps(decoratee)
         def guarded(*args, **kwargs):
+            """
+            Checks if arguments pass through guards before calling the guarded function. If they're not, then
+            GuardError is raised.
+            """
 
             # bind defaults, args and kwargs to names
             bound_args = argument_defaults.copy() # get defaults first, so they can be overwritten
@@ -389,9 +433,17 @@ def guard(*dargs, **dkwargs):
         return decorator
 
 def rguard(rel_guard, **kwargs):
+    """
+    Converts first and only positional argument to a RelGuard object.
+    By using rguard you guarantee that `rel_guard` is a correctly defined relguard function.
+    """
     return guard(RelGuard(rel_guard), **kwargs)
 
 def raguard(decoratee):
+    """
+    Converts return annotation to a RelGuard object.
+    By using raguard you guarantee that return annotation holds a correctly defined relguard function.
+    """
     try:
         rel_guard = decoratee.__annotations__['return']
     except (AttributeError, KeyError):
@@ -402,11 +454,17 @@ def raguard(decoratee):
 # CASE #
 
 class MultiFunc():
+    """
+    Class capable of function call dispatch based on call arguments.
+    """
     def __init__(self):
         self.clauses = defaultdict(list) # seperate lists for different arities
         self.__name__ = None
 
     def __call__(self, *args, **kwargs):
+        """
+        Dispatch. Note that different arities are dispatched separately and independently.
+        """
         for clause in self.clauses[len(args) + len(kwargs)]:
             try:
                 return clause(*args, **kwargs) # call first matching function clause
@@ -416,6 +474,9 @@ class MultiFunc():
         raise MatchError("No match for given argument values")
 
     def append(self, arity, clause):
+        """
+        Append clause to `self.clauses` under given `arity`.
+        """
         if self.clauses.get(arity, False) and hasattr(self.clauses[-1], '__catchall__'):
             raise WontMatchError("Function clause defined after a catch-all clause")
 
@@ -428,10 +489,12 @@ function_refs = defaultdict(lambda: defaultdict(MultiFunc)) # needed for case to
     # module name -> fun (qual)name -> MultiFunc object
 
 def case(*dargs, **dkwargs):
-    ""
+    """
+    Creates MultiFunc object or appends function clauses to an existing one.
+    """
 
     def decorator(decoratee):
-        ""
+        "Actual decorator."
 
         # get arg_spec
         try:
@@ -516,6 +579,9 @@ def case(*dargs, **dkwargs):
         return decorator
 
 def dispatch(*dargs, **dkwargs):
+    """
+    Like `case`, but dispatch happens on type instead of values.
+    """
 
     def direct(decoratee):
         decoratee.__dispatch__ = True # this will intruct case to wrap args in isoftype.

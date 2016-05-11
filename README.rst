@@ -3,11 +3,11 @@ function-pattern-matching
 
 **function-pattern-matching** (**fpm** for short) is a module which introduces Erlang-style
 `multiple clause defined functions <http://erlang.org/doc/reference_manual/functions.html>`_ and
-`guard sequences <http://erlang.org/doc/reference_manual/functions.html#id77457>`_.
+`guard sequences <http://erlang.org/doc/reference_manual/functions.html#id77457>`_ to Python.
 
 This module is both Python 2 and 3 compatible.
 
-**Warning:** Readme and docs under construction.
+**Note:** Readme and docs under construction.
 
 .. contents:: Table of contents
 
@@ -105,6 +105,7 @@ List of provided guard functions
 Every following function returns/is a callable which takes only one parameter - the call argument that is to be
 checked.
 
+- ``_`` - Catch-all. Returns ``True`` for any input. Actually, this can take any number of arguments.
 - ``eq(val)`` - checks if input is equal to *val*
 - ``ne(val)`` - checks if input is not equal to *val*
 - ``lt(val)`` - checks if input is less than *val*
@@ -116,7 +117,7 @@ checked.
 - ``isoftype(_type)`` - checks if input is instance of *_type* (uses ``isintance`` function)
 - ``isiterable`` - checks if input is iterable
 - ``eTrue`` - checks if input evaluates to ``True`` (converts input to ``bool``)
-- ``eFalse`` - checks if input is evaluates to ``False`` (converts input to ``bool``)
+- ``eFalse`` - checks if input evaluates to ``False`` (converts input to ``bool``)
 - ``In(val)`` - checks if input is in *val* (uses ``in`` operator)
 - ``notIn(val)`` - checks if input is not in *val* (uses ``not in`` operator)
 
@@ -287,10 +288,10 @@ Example:
     >>> func(1337)
     'some var: 1337'
 
-If no clause match, then ``MatchError`` is raised. Above example has a catch-all clause, so ``MatchError`` will never
-occur.
+If no clause matches, then ``MatchError`` is raised. The example shown above has a catch-all clause, so ``MatchError``
+will never occur.
 
-Different arities (argument count) are allowed and are dispatched separetely
+Different arities (argument count) are allowed and are dispatched separetely.
 
 Example:
 

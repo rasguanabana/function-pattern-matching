@@ -174,13 +174,6 @@ class GuardFunc():
         """Forward call to `self.test`"""
         return self.test(inp)
 
-    def __bool__(self):
-        """Handle conversion to boolean (py3)"""
-        return self.__call__()
-    def __nonzero__(self):
-        """Handle conversion to boolean (py2)"""
-        return self.__call__()
-
 def makeguard(decoratee):
     "Decorator which turns decoratee to GuardFunc object."
     return GuardFunc(decoratee)
@@ -211,9 +204,9 @@ def Isnot(val):
     "Is inp different object than val."
     return GuardFunc(lambda inp: inp is not val)
 
-def isoftype(type_):
-    "Is inp an instance of type_."
-    return GuardFunc(lambda inp: isinstance(inp, type_))
+def isoftype(*types):
+    "Is inp an instance of any of types."
+    return GuardFunc(lambda inp: isinstance(inp, types))
 
 @makeguard
 def isiterable(inp):

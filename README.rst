@@ -405,7 +405,39 @@ Example:
 Examples (the useful ones)
 ==========================
 
-Working on it!
+Still working on this section!
+
+- Ensure that an argument is a list of strings. Prevent feeding string accidentally, which can cause some headache,
+  since both are iterables.
+
+  - Option 1: do not allow strings
+
+    .. code-block:: python
+
+        # thanks to creshal from HN for suggestion
+
+        lookup = {
+            "foo": 1,
+            "bar": 2,
+            "baz": 3
+        }
+
+        @fpm.guard
+        def getSetFromDict(
+            dict_, # let it throw TypeError if not a dict. Will be more descriptive than a GuardError.
+            keys: ~fpm.isoftype(str)
+        ):
+            "Returns a subset of elements of dict_"
+            ret_set = set()
+            for key in keys:
+                try:
+                    ret_set.add(dict_[key])
+                except KeyError:
+                    pass
+            return ret_set
+
+        getSetFromDict(lookup, ['foo', 'baz', 'not-in-lookup']) # will return two-element set
+        getSetFromDict(lookup, 'foo') # raises GuardError, but would return empty set without guard!
 
 Similar solutions
 =================

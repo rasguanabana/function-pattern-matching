@@ -206,6 +206,8 @@ def Isnot(val):
 
 def isoftype(*types):
     "Is inp an instance of any of types."
+    if len(types) == 1:
+        types = types[0]
     return GuardFunc(lambda inp: isinstance(inp, types))
 
 @makeguard

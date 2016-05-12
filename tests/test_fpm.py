@@ -63,6 +63,16 @@ class DoGuardsWork(unittest.TestCase):
         self.assertTrue(a9(10))
         self.assertFalse(a9('qwerty'))
 
+        a9b = fpm.isoftype(int, float)
+        self.assertTrue(a9b(10))
+        self.assertTrue(a9b(10.5))
+        self.assertFalse(a9b('x'))
+
+        a9c = fpm.isoftype((int, float))
+        self.assertTrue(a9c(10))
+        self.assertTrue(a9c(10.5))
+        self.assertFalse(a9c('x'))
+
         a10 = fpm.isiterable
         self.assertFalse(a10(10))
         self.assertTrue(a10("asd"))
